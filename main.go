@@ -1,11 +1,13 @@
 package main
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
+
+	"net/http"
+
 	"os/exec"
 	"strings"
 	"unicode"
@@ -19,28 +21,37 @@ type RequestData struct {
 func main() {
 
 	mux := http.NewServeMux()
+	
+	
 	mux.HandleFunc("/submit", func(w http.ResponseWriter, r *http.Request) {
-		var data RequestData
-		json.NewDecoder(r.Body).Decode(&data)
-		w.Write([]byte(fmt.Sprintf("received the following form data: %v - %v", data.VideoURL, data.ClipDuration)))
+		// var data RequestData
+		// json.NewDecoder(r.Body).Decode(&data)
+		//w.Write([]byte(fmt.Sprintf("received the following form data: %v - %v", data.VideoURL, data.ClipDuration)))
+
+		data := RequestData{
+			VideoURL:     r.FormValue("videoUrl"),
+			ClipDuration: r.FormValue("clipDuration")}
+
+		// todo: implemet sse to send clipping progress to the client
 		videoTitle := downloadVideo(data)
+		fmt.Println("Video Title:", videoTitle)
 
-		// Set response headers for download
-		w.Header().Set("Content-Type", "video/mp4")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%v", videoTitle))
-
-		// todo: let the user download the video, the following code is not working
-		file, _ := os.Open(videoTitle)
-		io.Copy(w, file)
-
+		
 	})
 
-	// fs := http.FileServer(http.Dir("./"))
-	// mux.Handle("/static/", http.StripPrefix("/static/", fs))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "page.html")
 	})
 
+	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+		fileName := r.URL.Query().Get("file")
+		file, _ := os.Open(fileName)
+		defer file.Close()
+		// set response headers for download
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%v", fileName))
+		io.Copy(w, file)
+	})
 	// Create a new instance of the server
 	server := http.Server{Handler: mux, Addr: ":8080"}
 
@@ -116,6 +127,7 @@ func buildClipDownloadCommand(req RequestData) (*exec.Cmd, string) {
 		"./ffmpeg", "-i", videoURL,
 		"-ss", clipStart, // Set the clip start and end time
 		"-to", clipEnd,
+		// "-progress",
 		//"-c", "copy", // Copy without re-encoding (fast but the clip may not start at the exact time)
 		downloadPath,
 	)
@@ -133,9 +145,9 @@ func downloadVideo(req RequestData) string {
 
 	output, err := command.CombinedOutput()
 
+	fmt.Println("Output:", string(output))
 	if err != nil {
 		fmt.Println("Error downloading video:", err)
-		fmt.Println("Output:", string(output))
 		return ""
 	}
 

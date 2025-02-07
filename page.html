@@ -33,16 +33,6 @@
             font-size: 1.2rem;
         }
 
-        .nav {
-            display: flex;
-            gap: 2rem;
-        }
-
-        .nav a {
-            text-decoration: none;
-            color: #4a5568;
-        }
-
         .container {
             max-width: 800px;
             margin: 2rem auto;
@@ -157,13 +147,11 @@
         }
 
         .actions {
-            display: flex;
-            gap: 1rem;
             margin-top: 2rem;
         }
 
         .download-btn {
-            flex: 1;
+            width: 100%;
             padding: 0.75rem;
             background: #2d3748;
             color: white;
@@ -176,12 +164,21 @@
             gap: 0.5rem;
         }
 
-        .share-btn {
-            padding: 0.75rem;
-            background: #e2e8f0;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+        .duration-display {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #4a5568;
+        }
+
+        .duration-display span:first-child {
+            margin-right: 0.5rem;
+        }
+
+        #durationTime {
+            font-weight: bold;
         }
     </style>
 </head>
@@ -195,11 +192,6 @@
             </svg>
             VideoClipper
         </div>
-        <nav class="nav">
-            <a href="#">Tools</a>
-            <a href="#">Premium</a>
-            <a href="#">Support</a>
-        </nav>
     </header>
 
     <main class="container">
@@ -224,6 +216,10 @@
                 <label>End Time (hh:mm:ss)</label>
                 <input type="text" value="00:02:00" id="endTime">
             </div>
+        </div>
+        <div class="duration-display">
+            <span>Duration:</span>
+            <span id="durationTime">00:02:00</span>
         </div>
 
         <div class="timeline" id="timeline">
@@ -251,15 +247,6 @@
                 </svg>
                 Download Clip
             </button>
-            <button class="share-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
-            </button>
         </div>
     </main>
 
@@ -286,6 +273,13 @@
             return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         }
 
+        function updateDuration() {
+            const startSeconds = parseTimeToSeconds(startTimeInput.value);
+            const endSeconds = parseTimeToSeconds(endTimeInput.value);
+            const durationSeconds = endSeconds - startSeconds;
+            document.getElementById('durationTime').textContent = formatTime(Math.max(0, durationSeconds));
+        }
+
         function getHandlePosition(handle) {
             const timelineRect = timeline.getBoundingClientRect();
             const handleRect = handle.getBoundingClientRect();
@@ -304,6 +298,7 @@
             } else {
                 endTimeInput.value = formatTime(seconds);
             }
+            updateDuration();
         }
 
         function updateHandleFromTime(timeStr, handle) {
@@ -333,6 +328,7 @@
                     updateHandleFromTime(startTimeInput.value, startHandle);
                 }
             }
+            updateDuration();
         }
 
         function updateHandlePosition(handle, clientX) {
@@ -420,6 +416,7 @@
         updateHandleFromTime(startTimeInput.value, startHandle);
         updateHandleFromTime(endTimeInput.value, endHandle);
         updateTimelineProgress();
+        updateDuration();
 
         const pasteBtn = document.querySelector('.paste-btn');
         const videoUrlInput = document.getElementById('videoUrl');
@@ -435,3 +432,4 @@
     </script>
 </body>
 </html>
+
