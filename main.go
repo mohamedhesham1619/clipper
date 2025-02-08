@@ -1,13 +1,14 @@
 package main
 
 import (
-	//"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"os/exec"
 	"strings"
 	"unicode"
@@ -18,25 +19,31 @@ type RequestData struct {
 	ClipDuration string `json:"clipDuration"`
 }
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
 func main() {
 
 	mux := http.NewServeMux()
-	
-	
+
 	mux.HandleFunc("/submit", func(w http.ResponseWriter, r *http.Request) {
-		// var data RequestData
-		// json.NewDecoder(r.Body).Decode(&data)
-		//w.Write([]byte(fmt.Sprintf("received the following form data: %v - %v", data.VideoURL, data.ClipDuration)))
+		connec, _ := upgrader.Upgrade(w, r, nil)
+		defer connec.Close()
 
-		data := RequestData{
-			VideoURL:     r.FormValue("videoUrl"),
-			ClipDuration: r.FormValue("clipDuration")}
-
-		// todo: implemet sse to send clipping progress to the client
-		videoTitle := downloadVideo(data)
-		fmt.Println("Video Title:", videoTitle)
-
+		var data RequestData
 		
+		connec.ReadJSON(&data)
+		fmt.Println("Received data:", data.VideoURL, data.ClipDuration)
+
+		// Simulate processing with progress updates
+		for i := 1; i <= 5; i++ {
+			time.Sleep(1 * time.Second)
+			progressMsg := fmt.Sprintf("Progress %d%%", i*20)
+			connec.WriteMessage(websocket.TextMessage, []byte(progressMsg))
+		}
+		connec.WriteMessage(websocket.TextMessage, []byte("Done"))
+
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +59,7 @@ func main() {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%v", fileName))
 		io.Copy(w, file)
 	})
+
 	// Create a new instance of the server
 	server := http.Server{Handler: mux, Addr: ":8080"}
 

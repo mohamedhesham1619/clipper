@@ -197,63 +197,65 @@
     <main class="container">
         <h1>Create Your Video Clip</h1>
         
-        <div class="url-input">
-            <input type="text" placeholder="Paste YouTube, Vimeo, or any video URL" id="videoUrl">
-            <button class="paste-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                </svg>
-            </button>
-        </div>
+        <form id="clipForm">
+            <div class="url-input">
+                <input type="text" placeholder="Paste YouTube, Vimeo, or any video URL" id="videoUrl" name="videoUrl">
+                <button type="button" class="paste-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    </svg>
+                </button>
+            </div>
 
-        <div class="time-controls">
-            <div class="time-input">
+            <div class="time-controls">
+                <div class="time-input">
                 <label>Start Time (hh:mm:ss)</label>
-                <input type="text" value="00:00:00" id="startTime">
-            </div>
-            <div class="time-input">
+                <input type="text" value="00:00:00" id="startTime" oninput="updateDuration()">
+                </div>
+                <div class="time-input">
                 <label>End Time (hh:mm:ss)</label>
-                <input type="text" value="00:02:00" id="endTime">
+                <input type="text" value="00:02:00" id="endTime" oninput="updateDuration()">
+                </div>
             </div>
-        </div>
-        <div class="duration-display">
-            <span>Duration:</span>
-            <span id="durationTime">00:02:00</span>
-        </div>
-
-        <div class="timeline" id="timeline">
-            <div class="timeline-progress"></div>
-            <div class="handle" id="startHandle"></div>
-            <div class="handle" id="endHandle"></div>
-        </div>
-
-        <div class="progress-bar">
-            <div class="progress-bar-label">
-                <span>Processing Clip</span>
-                <span>75%</span>
+            <div class="duration-display">
+                <span>Duration:</span>
+                <span id="durationTime">00:02:00</span>
             </div>
-            <div class="progress-track">
-                <div class="progress-fill"></div>
-            </div>
-        </div>
 
-        <div class="actions">
-            <button class="download-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Download Clip
-            </button>
-        </div>
+            <!-- <div class="timeline" id="timeline">
+                <div class="timeline-progress"></div>
+                <div class="handle" id="startHandle"></div>
+                <div class="handle" id="endHandle"></div>
+            </div> -->
+
+            <div class="progress-bar">
+                <div class="progress-bar-label">
+                    <span>Processing Clip</span>
+                    <span>100%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="download-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download Clip
+                </button>
+            </div>
+        </form>
     </main>
 
     <script>
-        const timeline = document.getElementById('timeline');
-        const startHandle = document.getElementById('startHandle');
-        const endHandle = document.getElementById('endHandle');
+        // const timeline = document.getElementById('timeline');
+        // const startHandle = document.getElementById('startHandle');
+        // const endHandle = document.getElementById('endHandle');
         const startTimeInput = document.getElementById('startTime');
         const endTimeInput = document.getElementById('endTime');
 
@@ -274,39 +276,45 @@
         }
 
         function updateDuration() {
-            const startSeconds = parseTimeToSeconds(startTimeInput.value);
-            const endSeconds = parseTimeToSeconds(endTimeInput.value);
-            const durationSeconds = endSeconds - startSeconds;
-            document.getElementById('durationTime').textContent = formatTime(Math.max(0, durationSeconds));
-        }
-
-        function getHandlePosition(handle) {
-            const timelineRect = timeline.getBoundingClientRect();
-            const handleRect = handle.getBoundingClientRect();
-            return (handleRect.left - timelineRect.left + handleRect.width / 2) / timelineRect.width;
-        }
-
-        function setHandlePosition(handle, position) {
-            position = Math.max(0, Math.min(1, position));
-            handle.style.left = `${position * 100}%`;
-        }
-
-        function updateTimeFromHandle(handle, position) {
-            const seconds = Math.floor(position * TOTAL_SECONDS);
-            if (handle === startHandle) {
-                startTimeInput.value = formatTime(seconds);
-            } else {
-                endTimeInput.value = formatTime(seconds);
+            const startInput = startTimeInput.value.trim();
+            const endInput = endTimeInput.value.trim();
+            
+            // Only update if both inputs are in the correct format
+            if (startInput.split(':').length === 3 && endInput.split(':').length === 3) {
+                const startSeconds = parseTimeToSeconds(startInput);
+                const endSeconds = parseTimeToSeconds(endInput);
+                const durationSeconds = Math.max(0, endSeconds - startSeconds);
+                document.getElementById('durationTime').textContent = formatTime(durationSeconds);
             }
-            updateDuration();
         }
 
-        function updateHandleFromTime(timeStr, handle) {
-            const seconds = parseTimeToSeconds(timeStr);
-            const position = seconds / TOTAL_SECONDS;
-            setHandlePosition(handle, position);
-            updateTimelineProgress();
-        }
+        // function getHandlePosition(handle) {
+        //     const timelineRect = timeline.getBoundingClientRect();
+        //     const handleRect = handle.getBoundingClientRect();
+        //     return (handleRect.left - timelineRect.left + handleRect.width / 2) / timelineRect.width;
+        // }
+
+        // function setHandlePosition(handle, position) {
+        //     position = Math.max(0, Math.min(1, position));
+        //     handle.style.left = `${position * 100}%`;
+        // }
+
+        // function updateTimeFromHandle(handle, position) {
+        //     const seconds = Math.floor(position * TOTAL_SECONDS);
+        //     if (handle === startHandle) {
+        //         startTimeInput.value = formatTime(seconds);
+        //     } else {
+        //         endTimeInput.value = formatTime(seconds);
+        //     }
+        //     updateDuration();
+        // }
+
+        // function updateHandleFromTime(timeStr, handle) {
+        //     const seconds = parseTimeToSeconds(timeStr);
+        //     const position = seconds / TOTAL_SECONDS;
+        //     setHandlePosition(handle, position);
+        //     updateTimelineProgress();
+        // }
 
         function validateTimeInputs() {
             const startSeconds = parseTimeToSeconds(startTimeInput.value);
@@ -331,52 +339,52 @@
             updateDuration();
         }
 
-        function updateHandlePosition(handle, clientX) {
-            const timelineRect = timeline.getBoundingClientRect();
-            let position = (clientX - timelineRect.left) / timelineRect.width;
+        // function updateHandlePosition(handle, clientX) {
+        //     const timelineRect = timeline.getBoundingClientRect();
+        //     let position = (clientX - timelineRect.left) / timelineRect.width;
             
-            position = Math.max(0, Math.min(1, position));
+        //     position = Math.max(0, Math.min(1, position));
 
-            if (handle === startHandle) {
-                const endPosition = getHandlePosition(endHandle);
-                position = Math.min(position, endPosition);
-            } else {
-                const startPosition = getHandlePosition(startHandle);
-                position = Math.max(position, startPosition);
-            }
+        //     if (handle === startHandle) {
+        //         const endPosition = getHandlePosition(endHandle);
+        //         position = Math.min(position, endPosition);
+        //     } else {
+        //         const startPosition = getHandlePosition(startHandle);
+        //         position = Math.max(position, startPosition);
+        //     }
 
-            setHandlePosition(handle, position);
-            updateTimeFromHandle(handle, position);
-            validateTimeInputs();
-            updateTimelineProgress();
-        }
+        //     setHandlePosition(handle, position);
+        //     updateTimeFromHandle(handle, position);
+        //     validateTimeInputs();
+        //     updateTimelineProgress();
+        // }
 
-        function updateTimelineProgress() {
-            const startPosition = getHandlePosition(startHandle);
-            const endPosition = getHandlePosition(endHandle);
-            const progressBar = document.querySelector('.timeline-progress');
-            progressBar.style.left = `${startPosition * 100}%`;
-            progressBar.style.width = `${(endPosition - startPosition) * 100}%`;
-        }
+        // function updateTimelineProgress() {
+        //     const startPosition = getHandlePosition(startHandle);
+        //     const endPosition = getHandlePosition(endHandle);
+        //     const progressBar = document.querySelector('.timeline-progress');
+        //     progressBar.style.left = `${startPosition * 100}%`;
+        //     progressBar.style.width = `${(endPosition - startPosition) * 100}%`;
+        // }
 
-        [startHandle, endHandle].forEach(handle => {
-            handle.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                currentHandle = handle;
-                e.preventDefault();
-            });
-        });
+        // [startHandle, endHandle].forEach(handle => {
+        //     handle.addEventListener('mousedown', (e) => {
+        //         isDragging = true;
+        //         currentHandle = handle;
+        //         e.preventDefault();
+        //     });
+        // });
 
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging && currentHandle) {
-                updateHandlePosition(currentHandle, e.clientX);
-            }
-        });
+        // document.addEventListener('mousemove', (e) => {
+        //     if (isDragging && currentHandle) {
+        //         updateHandlePosition(currentHandle, e.clientX);
+        //     }
+        // });
 
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            currentHandle = null;
-        });
+        // document.addEventListener('mouseup', () => {
+        //     isDragging = false;
+        //     currentHandle = null;
+        // });
 
         function validateTimeFormat(timeStr) {
             const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/;
@@ -384,38 +392,39 @@
         }
 
         [startTimeInput, endTimeInput].forEach(input => {
-            input.addEventListener('change', (e) => {
-                const timeStr = e.target.value;
+            input.addEventListener('keyup', (e) => {
+                let value = e.target.value;
                 
-                if (!validateTimeFormat(timeStr)) {
-                    e.target.value = formatTime(0);
-                    return;
+                // Auto-add colons if they're missing
+                if (value.length === 2 || value.length === 5) {
+                    value += ':';
+                    e.target.value = value;
                 }
-
-                const handle = input === startTimeInput ? startHandle : endHandle;
-                currentHandle = handle;
-                updateHandleFromTime(timeStr, handle);
-                validateTimeInputs();
-                currentHandle = null;
+                
+                // Try to update duration if we have a complete time format
+                if (value.split(':').length === 3) {
+                    updateDuration();
+                }
             });
 
-            input.addEventListener('input', (e) => {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length > 6) {
-                    value = value.slice(0, 6);
+            input.addEventListener('change', (e) => {
+                let value = e.target.value;
+                if (!validateTimeFormat(value)) {
+                    value = '00:00:00';
+                    e.target.value = value;
                 }
-                if (value.length >= 4) {
-                    value = value.slice(0, 2) + ':' + value.slice(2, 4) + ':' + value.slice(4);
-                } else if (value.length >= 2) {
-                    value = value.slice(0, 2) + ':' + value.slice(2);
-                }
-                e.target.value = value;
+                updateDuration();
+            });
+
+            // Also update duration when input loses focus
+            input.addEventListener('blur', () => {
+                updateDuration();
             });
         });
 
-        updateHandleFromTime(startTimeInput.value, startHandle);
-        updateHandleFromTime(endTimeInput.value, endHandle);
-        updateTimelineProgress();
+        // updateHandleFromTime(startTimeInput.value, startHandle);
+        // updateHandleFromTime(endTimeInput.value, endHandle);
+        // updateTimelineProgress();
         updateDuration();
 
         const pasteBtn = document.querySelector('.paste-btn');
@@ -428,6 +437,24 @@
             } catch (err) {
                 console.error('Failed to read clipboard:', err);
             }
+        });
+
+        document.getElementById('clipForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const videoUrl = document.getElementById('videoUrl').value;
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const clipDuration = `${startTime}-${endTime}`;
+
+            const socket = new WebSocket('ws://localhost:8080/submit');
+            socket.onopen = () => {
+                console.log('Connected to server');
+                socket.send(JSON.stringify({ videoUrl, clipDuration }));
+            };
+            socket.onmessage = (event) => {
+                console.log('Message from server:', event.data);
+            };
+           
         });
     </script>
 </body>
