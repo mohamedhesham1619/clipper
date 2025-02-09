@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -39,7 +40,7 @@
             padding: 2rem;
             background: white;
             border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         h1 {
@@ -182,6 +183,7 @@
         }
     </style>
 </head>
+
 <body>
     <header class="header">
         <div class="logo">
@@ -196,13 +198,13 @@
 
     <main class="container">
         <h1>Create Your Video Clip</h1>
-        
+
         <form id="clipForm">
             <div class="url-input">
                 <input type="text" placeholder="Paste YouTube, Vimeo, or any video URL" id="videoUrl" name="videoUrl">
                 <button type="button" class="paste-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                        <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
                         <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                     </svg>
                 </button>
@@ -210,12 +212,12 @@
 
             <div class="time-controls">
                 <div class="time-input">
-                <label>Start Time (hh:mm:ss)</label>
-                <input type="text" value="00:00:00" id="startTime" oninput="updateDuration()">
+                    <label>Start Time (hh:mm:ss)</label>
+                    <input type="text" value="00:00:00" id="startTime" oninput="updateDuration()">
                 </div>
                 <div class="time-input">
-                <label>End Time (hh:mm:ss)</label>
-                <input type="text" value="00:02:00" id="endTime" oninput="updateDuration()">
+                    <label>End Time (hh:mm:ss)</label>
+                    <input type="text" value="00:02:00" id="endTime" oninput="updateDuration()">
                 </div>
             </div>
             <div class="duration-display">
@@ -278,7 +280,7 @@
         function updateDuration() {
             const startInput = startTimeInput.value.trim();
             const endInput = endTimeInput.value.trim();
-            
+
             // Only update if both inputs are in the correct format
             if (startInput.split(':').length === 3 && endInput.split(':').length === 3) {
                 const startSeconds = parseTimeToSeconds(startInput);
@@ -342,7 +344,7 @@
         // function updateHandlePosition(handle, clientX) {
         //     const timelineRect = timeline.getBoundingClientRect();
         //     let position = (clientX - timelineRect.left) / timelineRect.width;
-            
+
         //     position = Math.max(0, Math.min(1, position));
 
         //     if (handle === startHandle) {
@@ -394,13 +396,13 @@
         [startTimeInput, endTimeInput].forEach(input => {
             input.addEventListener('keyup', (e) => {
                 let value = e.target.value;
-                
+
                 // Auto-add colons if they're missing
                 if (value.length === 2 || value.length === 5) {
                     value += ':';
                     e.target.value = value;
                 }
-                
+
                 // Try to update duration if we have a complete time format
                 if (value.split(':').length === 3) {
                     updateDuration();
@@ -451,12 +453,24 @@
                 console.log('Connected to server');
                 socket.send(JSON.stringify({ videoUrl, clipDuration }));
             };
-            socket.onmessage = (event) => {
+            socket.onmessage = async (event) => {
                 console.log('Message from server:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.status === 'done') {
+                        const link = document.createElement('a');
+                        link.href = data.downloadUrl;
+                        link.download = ''; // Ensures the browser treats it as a download
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
             };
-           
         });
     </script>
 </body>
-</html>
 
+</html>
