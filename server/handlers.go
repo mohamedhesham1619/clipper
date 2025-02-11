@@ -1,6 +1,7 @@
 package main
 
 import (
+	"clipper/utils"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,9 +11,18 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
 	"github.com/gorilla/websocket"
-	"clipper/server/utils"
+	//"clipper/server/utils"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+// store the file IDs and their corresponding file names
+var fileIDs = make(map[string]string)
+
 
 func submitHandler(w http.ResponseWriter, r *http.Request) {
 
