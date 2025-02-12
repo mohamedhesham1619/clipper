@@ -1,6 +1,7 @@
 package main
 
 import (
+	"clipper/models"
 	"clipper/utils"
 	"fmt"
 	"io"
@@ -23,7 +24,6 @@ var upgrader = websocket.Upgrader{
 // store the file IDs and their corresponding file names
 var fileIDs = make(map[string]string)
 
-
 func submitHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Upgrade the HTTP connection to a WebSocket connection
@@ -36,9 +36,8 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	// ensure the connection is closed when the function returns
 	defer connec.Close()
 
-	
 	// Read the request data from the client
-	var data struct{
+	var data struct {
 		VideoURL     string `json:"videoUrl"`
 		ClipDuration string `json:"clipDuration"`
 	}
@@ -47,26 +46,24 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received request", "data", data)
 
 	// Download the video clip
-	fileName, err := utils.DownloadVideo(data.VideoURL, data.ClipDuration)
+	fileName, progressChannel, err := utils.DownloadVideo(data.VideoURL, data.ClipDuration)
 
 	if err != nil {
-		connec.WriteJSON(map[string]string{"status": "error", "message": err.Error()})
+		connec.WriteJSON(models.ProgressResponse{Status: "error"})
 		slog.Error("Error downloading video", "error", err, "request", data)
 		return
+	}
+
+	for response := range progressChannel {
+		connec.WriteJSON(response)
 	}
 
 	// Generate a unique ID for the file and store it
 	fileId := utils.GenerateID()
 	fileIDs[fileId] = fileName
 
-	// Simulate processing with progress updates
-	for i := 1; i <= 5; i++ {
-		time.Sleep(1 * time.Second)
-		progressMsg := fmt.Sprintf("Progress %d%%", i*20)
-		connec.WriteMessage(websocket.TextMessage, []byte(progressMsg))
-	}
+	connec.WriteJSON(models.ProgressResponse{Status: "finished",Progress: 100, DownloadUrl: fmt.Sprintf("/download/%v", fileId)})
 
-	connec.WriteJSON(map[string]string{"status": "done", "downloadUrl": fmt.Sprintf("/download/%v", fileId)})
 	slog.Info("process complete", "fileId", fileId, "fileName", fileName, "downloadUrl", fmt.Sprintf("/download/%v", fileId))
 
 }

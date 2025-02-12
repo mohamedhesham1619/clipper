@@ -124,6 +124,7 @@
         }
 
         .progress-bar {
+            display: none;  /* Initially hidden */
             margin: 2rem 0;
         }
 
@@ -140,11 +141,23 @@
         }
 
         .progress-fill {
-            width: 75%;
+            width: 0;  /* Start at 0% */
             height: 100%;
             background: #4a5568;
             border-radius: 2px;
             transition: width 0.3s ease;
+        }
+
+        .progress-fill.connecting {
+            width: 100%;
+            background: #718096;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .actions {
@@ -180,6 +193,20 @@
 
         #durationTime {
             font-weight: bold;
+        }
+
+        @keyframes ellipsis {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            animation: ellipsis 2s steps(1) infinite;
         }
     </style>
 </head>
@@ -245,7 +272,7 @@
             <div class="progress-bar">
                 <div class="progress-bar-label">
                     <span>Processing Clip</span>
-                    <span>100%</span>
+                    <span class="progress-value">0%</span>
                 </div>
                 <div class="progress-track">
                     <div class="progress-fill"></div>
@@ -449,22 +476,43 @@
             const endTime = document.getElementById('endTime').value;
             const clipDuration = `${startTime}-${endTime}`;
 
+            const progressBar = document.querySelector('.progress-bar');
+            const progressFill = document.querySelector('.progress-fill');
+            const progressValue = document.querySelector('.progress-value');
+            const progressLabel = document.querySelector('.progress-bar-label span:first-child');
+
+            // Show connecting state immediately
+            progressBar.style.display = 'block';
+            progressFill.classList.add('connecting');
+            progressValue.textContent = 'Connecting...';
+            progressLabel.textContent = 'Initializing';
+
             const socket = new WebSocket('ws://localhost:8080/submit');
             socket.onopen = () => {
                 console.log('Connected to server');
+                progressLabel.textContent = 'Connected';
+                progressValue.textContent = 'Starting';
+                progressValue.classList.add('loading'); // Add the loading class
                 socket.send(JSON.stringify({ videoUrl, clipDuration }));
             };
             socket.onmessage = async (event) => {
                 console.log('Message from server:', event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.status === 'done') {
-                        const link = document.createElement('a');
-                        link.href = data.downloadUrl;
-                        link.download = ''; // Ensures the browser treats it as a download
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                    if (data.status === 'in_progress') {
+                        progressValue.classList.remove('loading'); // Remove loading animation
+                        progressFill.classList.remove('connecting');
+                        progressFill.style.width = `${data.progress}%`;
+                        progressValue.textContent = `${Math.round(data.progress)}%`;
+                        progressLabel.textContent = 'Processing Clip';
+                    } else if (data.status === 'finished') {
+                        progressFill.classList.remove('connecting');
+                        progressFill.style.width = '100%';
+                        progressLabel.textContent = 'Processing Complete';
+                        progressValue.textContent = 'Download starting...';
+                        setTimeout(() => {
+                            window.location.href = data.downloadUrl;
+                        }, 1000);
                     }
                 } catch (error) {
                     console.error('Error:', error);
