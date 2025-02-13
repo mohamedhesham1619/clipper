@@ -36,11 +36,13 @@
 
         .container {
             max-width: 800px;
+            width: 100%;
             margin: 2rem auto;
-            padding: 2rem;
+            padding: 1.5rem;
             background: white;
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
         }
 
         h1 {
@@ -76,10 +78,13 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 1rem;
+            align-items: flex-start; /* Ensure top alignment */
         }
 
         .time-input {
             width: 48%;
+            display: flex;
+            flex-direction: column;
         }
 
         .time-input label {
@@ -232,6 +237,64 @@
             display: inline-block;
             animation: ellipsis 2s steps(1) infinite;
         }
+
+        .page-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            padding: 0 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .ad-container {
+            width: 160px;
+            min-height: 600px;
+            background: #e2e8f0;
+            border: 2px dashed #94a3b8;
+            border-radius: 8px;
+            margin-top: 2rem;
+            position: sticky;
+            top: 2rem;
+            display: none;
+            text-align: center;
+            padding: 1rem;
+            color: #64748b;
+        }
+
+        /* Responsive styles */
+        @media screen and (min-width: 1200px) {
+            .ad-container {
+                display: block;
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+                padding: 1rem;
+            }
+
+            .time-controls {
+                gap: 1.5rem;  /* Add space between time inputs on mobile */
+            }
+
+            .time-input {
+                width: 47%;  /* Slightly reduce width to prevent wrapping */
+                margin: 0; /* Remove any default margins */
+                padding: 0; /* Remove any default padding */
+            }
+
+            .url-input {
+                flex-direction: column;
+            }
+
+            .paste-btn {
+                width: 100%;
+                margin-top: 0.5rem;
+            }
+        }
     </style>
 </head>
 
@@ -247,60 +310,68 @@
         </div>
     </header>
 
-    <main class="container">
-        <h1>Create Your Video Clip</h1>
+    <div class="page-wrapper">
+        <aside class="ad-container">
+            Advertisement Space
+        </aside>
 
-        <form id="clipForm">
-            <div class="url-input">
-                <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
-                    name="videoUrl">
-                <button type="button" class="paste-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
-                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                    </svg>
-                </button>
-            </div>
+        <main class="container">
+            <h1>Create Your Video Clip</h1>
 
-            <div class="time-controls">
-                <div class="time-input">
-                    <label>Start Time (hh:mm:ss)</label>
-                    <input type="text" value="00:00:00" id="startTime" oninput="updateDuration()">
+            <form id="clipForm">
+                <div class="url-input">
+                    <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
+                        name="videoUrl">
+                    <button type="button" class="paste-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                        </svg>
+                    </button>
                 </div>
-                <div class="time-input">
-                    <label>End Time (hh:mm:ss)</label>
-                    <input type="text" value="00:01:00" id="endTime" oninput="updateDuration()">
+
+                <div class="time-controls">
+                    <div class="time-input">
+                        <label>Start Time (hh:mm:ss)</label>
+                        <input type="text" value="00:00:00" id="startTime" oninput="updateDuration()">
+                    </div>
+                    <div class="time-input">
+                        <label>End Time (hh:mm:ss)</label>
+                        <input type="text" value="00:01:00" id="endTime" oninput="updateDuration()">
+                    </div>
                 </div>
-            </div>
-            <div class="duration-display">
-                <span>Duration:</span>
-                <span id="durationTime">00:01:00</span>
-            </div>
-
-
-
-            <div class="actions">
-                <button type="submit" class="download-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download Clip
-                </button>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-bar-label">
-                    <span>Processing Clip</span>
-                    <span class="progress-value">0%</span>
+                <div class="duration-display">
+                    <span>Duration:</span>
+                    <span id="durationTime">00:01:00</span>
                 </div>
-                <div class="progress-track">
-                    <div class="progress-fill"></div>
-                </div>
-            </div>
 
-        </form>
-    </main>
+                <div class="actions">
+                    <button type="submit" class="download-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download Clip
+                    </button>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar-label">
+                        <span>Processing Clip</span>
+                        <span class="progress-value">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+
+            </form>
+        </main>
+
+        <aside class="ad-container">
+            Advertisement Space
+        </aside>
+    </div>
 
     <script>
 

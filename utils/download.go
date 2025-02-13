@@ -44,15 +44,16 @@ func BuildClipDownloadCommand(videoUrl, clipStart, clipEnd string) (*exec.Cmd, s
 	slog.Debug("video title sanitization", "before:", lines[0], "after:", videoTitle)
 
 	// Get the absolute path to the download directory
-	downloadPath, _ := filepath.Abs(fmt.Sprintf("../assets/videos/%v", videoTitle))
+	downloadPath, _ := filepath.Abs(fmt.Sprintf("temp/%v", videoTitle))
 
 	// Prepare the command to download the video clip
 	ffmpegCmd := exec.Command(
-		"./ffmpeg", "-i", videoURL,
+		"./ffmpeg",
 		"-ss", clipStart,
+		"-i", videoURL,
 		"-to", clipEnd,
 		"-progress", "pipe:1",
-		"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time). 
+		"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time).
 		downloadPath,
 	)
 

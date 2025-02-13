@@ -3,8 +3,8 @@ package main
 import (
 	"clipper/models"
 	"clipper/utils"
+	"embed"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"io"
 	"log/slog"
 	"mime"
@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -64,8 +66,16 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+//go:embed client/web/page.html
+var content embed.FS
+
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "../client/web/page.html")
+	data, err := content.ReadFile("client/web/page.html")
+	if err != nil {
+		http.Error(w, "Error reading file", http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +93,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath, _ := filepath.Abs(fmt.Sprintf("../assets/videos/%v", fileName))
+	filePath, _ := filepath.Abs(fmt.Sprintf("temp/%v", fileName))
 	// Open the file
 	file, err := os.Open(filePath)
 
