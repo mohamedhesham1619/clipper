@@ -124,7 +124,8 @@
         }
 
         .progress-bar {
-            display: none;  /* Initially hidden */
+            display: none;
+            /* Initially hidden */
             margin: 2rem 0;
         }
 
@@ -141,7 +142,8 @@
         }
 
         .progress-fill {
-            width: 0;  /* Start at 0% */
+            width: 0;
+            /* Start at 0% */
             height: 100%;
             background: #4a5568;
             border-radius: 2px;
@@ -155,9 +157,17 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         .actions {
@@ -196,11 +206,25 @@
         }
 
         @keyframes ellipsis {
-            0% { content: ''; }
-            25% { content: '.'; }
-            50% { content: '..'; }
-            75% { content: '...'; }
-            100% { content: ''; }
+            0% {
+                content: '';
+            }
+
+            25% {
+                content: '.';
+            }
+
+            50% {
+                content: '..';
+            }
+
+            75% {
+                content: '...';
+            }
+
+            100% {
+                content: '';
+            }
         }
 
         .loading::after {
@@ -228,7 +252,8 @@
 
         <form id="clipForm">
             <div class="url-input">
-                <input type="text" placeholder="Paste YouTube, Vimeo, or any video URL" id="videoUrl" name="videoUrl">
+                <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
+                    name="videoUrl">
                 <button type="button" class="paste-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
@@ -244,21 +269,16 @@
                 </div>
                 <div class="time-input">
                     <label>End Time (hh:mm:ss)</label>
-                    <input type="text" value="00:02:00" id="endTime" oninput="updateDuration()">
+                    <input type="text" value="00:01:00" id="endTime" oninput="updateDuration()">
                 </div>
             </div>
             <div class="duration-display">
                 <span>Duration:</span>
-                <span id="durationTime">00:02:00</span>
+                <span id="durationTime">00:01:00</span>
             </div>
 
-            <!-- <div class="timeline" id="timeline">
-                <div class="timeline-progress"></div>
-                <div class="handle" id="startHandle"></div>
-                <div class="handle" id="endHandle"></div>
-            </div> -->
 
-  
+
             <div class="actions">
                 <button type="submit" class="download-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -283,9 +303,7 @@
     </main>
 
     <script>
-        // const timeline = document.getElementById('timeline');
-        // const startHandle = document.getElementById('startHandle');
-        // const endHandle = document.getElementById('endHandle');
+
         const startTimeInput = document.getElementById('startTime');
         const endTimeInput = document.getElementById('endTime');
 
@@ -318,33 +336,6 @@
             }
         }
 
-        // function getHandlePosition(handle) {
-        //     const timelineRect = timeline.getBoundingClientRect();
-        //     const handleRect = handle.getBoundingClientRect();
-        //     return (handleRect.left - timelineRect.left + handleRect.width / 2) / timelineRect.width;
-        // }
-
-        // function setHandlePosition(handle, position) {
-        //     position = Math.max(0, Math.min(1, position));
-        //     handle.style.left = `${position * 100}%`;
-        // }
-
-        // function updateTimeFromHandle(handle, position) {
-        //     const seconds = Math.floor(position * TOTAL_SECONDS);
-        //     if (handle === startHandle) {
-        //         startTimeInput.value = formatTime(seconds);
-        //     } else {
-        //         endTimeInput.value = formatTime(seconds);
-        //     }
-        //     updateDuration();
-        // }
-
-        // function updateHandleFromTime(timeStr, handle) {
-        //     const seconds = parseTimeToSeconds(timeStr);
-        //     const position = seconds / TOTAL_SECONDS;
-        //     setHandlePosition(handle, position);
-        //     updateTimelineProgress();
-        // }
 
         function validateTimeInputs() {
             const startSeconds = parseTimeToSeconds(startTimeInput.value);
@@ -369,52 +360,7 @@
             updateDuration();
         }
 
-        // function updateHandlePosition(handle, clientX) {
-        //     const timelineRect = timeline.getBoundingClientRect();
-        //     let position = (clientX - timelineRect.left) / timelineRect.width;
 
-        //     position = Math.max(0, Math.min(1, position));
-
-        //     if (handle === startHandle) {
-        //         const endPosition = getHandlePosition(endHandle);
-        //         position = Math.min(position, endPosition);
-        //     } else {
-        //         const startPosition = getHandlePosition(startHandle);
-        //         position = Math.max(position, startPosition);
-        //     }
-
-        //     setHandlePosition(handle, position);
-        //     updateTimeFromHandle(handle, position);
-        //     validateTimeInputs();
-        //     updateTimelineProgress();
-        // }
-
-        // function updateTimelineProgress() {
-        //     const startPosition = getHandlePosition(startHandle);
-        //     const endPosition = getHandlePosition(endHandle);
-        //     const progressBar = document.querySelector('.timeline-progress');
-        //     progressBar.style.left = `${startPosition * 100}%`;
-        //     progressBar.style.width = `${(endPosition - startPosition) * 100}%`;
-        // }
-
-        // [startHandle, endHandle].forEach(handle => {
-        //     handle.addEventListener('mousedown', (e) => {
-        //         isDragging = true;
-        //         currentHandle = handle;
-        //         e.preventDefault();
-        //     });
-        // });
-
-        // document.addEventListener('mousemove', (e) => {
-        //     if (isDragging && currentHandle) {
-        //         updateHandlePosition(currentHandle, e.clientX);
-        //     }
-        // });
-
-        // document.addEventListener('mouseup', () => {
-        //     isDragging = false;
-        //     currentHandle = null;
-        // });
 
         function validateTimeFormat(timeStr) {
             const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/;
@@ -452,9 +398,7 @@
             });
         });
 
-        // updateHandleFromTime(startTimeInput.value, startHandle);
-        // updateHandleFromTime(endTimeInput.value, endHandle);
-        // updateTimelineProgress();
+
         updateDuration();
 
         const pasteBtn = document.querySelector('.paste-btn');
@@ -471,10 +415,15 @@
 
         document.getElementById('clipForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const videoUrl = document.getElementById('videoUrl').value;
-            const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
-            const clipDuration = `${startTime}-${endTime}`;
+            const videoUrl = document.getElementById('videoUrl').value.trim();
+            const clipStart = document.getElementById('startTime').value;
+            const clipEnd = document.getElementById('endTime').value;
+
+            // Validate URL
+            if (!videoUrl) {
+                alert('Please enter a video URL');
+                return;
+            }
 
             const progressBar = document.querySelector('.progress-bar');
             const progressFill = document.querySelector('.progress-fill');
@@ -487,19 +436,31 @@
             progressValue.textContent = 'Connecting...';
             progressLabel.textContent = 'Initializing';
 
-            const socket = new WebSocket('ws://localhost:8080/submit');
+            const socket = new WebSocket(`ws://${window.location.hostname}:8080/submit`);
             socket.onopen = () => {
                 console.log('Connected to server');
                 progressLabel.textContent = 'Connected';
                 progressValue.textContent = 'Starting';
-                progressValue.classList.add('loading'); // Add the loading class
-                socket.send(JSON.stringify({ videoUrl, clipDuration }));
+                progressValue.classList.add('loading');
+                // Send separate start and end times
+                socket.send(JSON.stringify({
+                    videoUrl,
+                    clipStart,
+                    clipEnd
+                }));
             };
             socket.onmessage = async (event) => {
                 console.log('Message from server:', event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.status === 'in_progress') {
+                    if (data.status === 'error') {
+                        alert(data.message || 'Failed to process video');
+                        progressFill.classList.remove('connecting');
+                        progressFill.style.width = '0%';
+                        progressLabel.textContent = 'Error';
+                        progressValue.textContent = data.message || 'Failed to process video';
+                        progressValue.style.color = '#dc2626'; // Red color for error
+                    } else if (data.status === 'in_progress') {
                         progressValue.classList.remove('loading'); // Remove loading animation
                         progressFill.classList.remove('connecting');
                         progressFill.style.width = `${data.progress}%`;
@@ -516,7 +477,19 @@
                     }
                 } catch (error) {
                     console.error('Error:', error);
+                    alert('Failed to process server response');
+                    progressLabel.textContent = 'Error';
+                    progressValue.textContent = 'Something went wrong';
+                    progressValue.style.color = '#dc2626';
                 }
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                alert('Failed to connect to server');
+                progressLabel.textContent = 'Connection Error';
+                progressValue.textContent = 'Failed to connect to server';
+                progressValue.style.color = '#dc2626';
             };
         });
     </script>

@@ -12,13 +12,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/submit", submitHandler)
-
 	mux.HandleFunc("/", homeHandler)
+	
+	mux.HandleFunc("/submit", submitHandler)
 
 	mux.HandleFunc("/download/", downloadHandler)
 
-	// Create a new instance of the server
 	server := http.Server{Handler: mux, Addr: ":8080"}
 
 	// Start the server

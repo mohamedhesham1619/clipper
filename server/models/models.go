@@ -5,3 +5,9 @@ type ProgressResponse struct{
 	Progress int	`json:"progress"`
 	DownloadUrl string `json:"downloadUrl"`
 }
+
+type VideoRequest struct {
+	VideoURL     string `json:"videoUrl"`
+	ClipStart string `json:"clipStart"`
+	ClipEnd string `json:"clipEnd"`
+}

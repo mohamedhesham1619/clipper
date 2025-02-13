@@ -4,6 +4,7 @@ import (
 	"clipper/models"
 	"clipper/utils"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"io"
 	"log/slog"
 	"mime"
@@ -12,9 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/gorilla/websocket"
-	//"clipper/server/utils"
 )
 
 var upgrader = websocket.Upgrader{
@@ -36,24 +34,22 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	// ensure the connection is closed when the function returns
 	defer connec.Close()
 
-	// Read the request data from the client
-	var data struct {
-		VideoURL     string `json:"videoUrl"`
-		ClipDuration string `json:"clipDuration"`
-	}
+	// Read the request videoRequest from the client
+	var videoRequest models.VideoRequest
 
-	connec.ReadJSON(&data)
-	slog.Info("Received request", "data", data)
+	connec.ReadJSON(&videoRequest)
+	slog.Info("Received request", "data", videoRequest)
 
 	// Download the video clip
-	fileName, progressChannel, err := utils.DownloadVideo(data.VideoURL, data.ClipDuration)
+	fileName, progressChannel, err := utils.DownloadVideo(videoRequest)
 
 	if err != nil {
 		connec.WriteJSON(models.ProgressResponse{Status: "error"})
-		slog.Error("Error downloading video", "error", err, "request", data)
+		slog.Error("Error downloading video", "error", err, "request", videoRequest)
 		return
 	}
 
+	// listen to progress channel and write the received message over the web socket
 	for response := range progressChannel {
 		connec.WriteJSON(response)
 	}
@@ -62,7 +58,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	fileId := utils.GenerateID()
 	fileIDs[fileId] = fileName
 
-	connec.WriteJSON(models.ProgressResponse{Status: "finished",Progress: 100, DownloadUrl: fmt.Sprintf("/download/%v", fileId)})
+	connec.WriteJSON(models.ProgressResponse{Status: "finished", Progress: 100, DownloadUrl: fmt.Sprintf("/download/%v", fileId)})
 
 	slog.Info("process complete", "fileId", fileId, "fileName", fileName, "downloadUrl", fmt.Sprintf("/download/%v", fileId))
 
@@ -113,9 +109,9 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	// Copy the file to the response writer
 	io.Copy(w, file)
 
-	// delete the file after 10 minutes
+	// delete the file after 15 minutes
 	go func() {
-		time.Sleep(1 * time.Minute)
+		time.Sleep(15 * time.Minute)
 		delete(fileIDs, fileId)
 		os.Remove(filePath)
 	}()
