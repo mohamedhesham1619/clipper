@@ -1,12 +1,25 @@
 package main
 
 import (
+	"log"
 	"log/slog"
-	"os"
 	"net/http"
-	
+	"os"
+	"os/exec"
 )
 
+// set the correct permissions for linux
+func init() {
+	err := exec.Command("chmod", "+x", "/workspace/yt-dlp").Run()
+	if err != nil {
+		log.Fatalf("Failed to set executable permission for yt-dlp: %v", err)
+	}
+
+	err = exec.Command("chmod", "+x", "/workspace/ffmpeg").Run()
+	if err != nil {
+		log.Fatalf("Failed to set executable permission for ffmpeg: %v", err)
+	}
+}
 
 func main() {
 
