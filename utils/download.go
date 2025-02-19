@@ -20,7 +20,7 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 
 	// Get both the URL and the title with the extension
 	cmd := exec.Command("./yt-dlp",
-		"-f", "bestvideo[height<=1080]+bestaudio",  // 720p video + best audio
+		"-f", "bestvideo[height<=1080]+bestaudio",
 		"--get-title",       // Get the video title
 		"--get-url",         // Get video and audio URLs
 		"--encoding", "UTF-8",
