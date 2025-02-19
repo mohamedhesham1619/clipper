@@ -507,7 +507,7 @@
             progressValue.textContent = 'Connecting...';
             progressLabel.textContent = 'Initializing';
 
-            const socket = new WebSocket(`ws://${window.location.hostname}:8080/submit`);
+            const socket = new WebSocket(`wss://${window.location.hostname}:8080/submit`);
             socket.onopen = () => {
                 console.log('Connected to server');
                 progressLabel.textContent = 'Connected';

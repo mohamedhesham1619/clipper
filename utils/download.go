@@ -11,16 +11,21 @@ import (
 	"strings"
 )
 
+// ==============================================================|
+// TODO: MAKE THE OPTION TO DOWNLOAD 360, 460, 720, 1080 QULAITY |
+// ==============================================================|
+
 // prepare the command to download the clip of the video
-func BuildClipDownloadCommand(videoUrl, clipStart, clipEnd string) (*exec.Cmd, string, error) {
+func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
 
 	// Get both the URL and the title with the extension
 	cmd := exec.Command("./yt-dlp",
-		"-f", "b",
-		"--print", "%(title)s.%(ext)s\n%(url)s",
+		"-f", "bestvideo[height<=1080]+bestaudio",  // 720p video + best audio
+		"--get-title",       // Get the video title
+		"--get-url",         // Get video and audio URLs
 		"--encoding", "UTF-8",
 		"--no-download",
-		videoUrl,
+		videoRequest.VideoURL,
 	)
 
 	output, err := cmd.Output()
@@ -33,13 +38,14 @@ func BuildClipDownloadCommand(videoUrl, clipStart, clipEnd string) (*exec.Cmd, s
 	// Split output into lines
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 
-	if len(lines) < 2 {
+	if len(lines) < 3 {
 
 		return nil, "", fmt.Errorf("expected both URL and title but got: %v", lines)
 	}
 
-	videoTitle := SanitizeFilename(lines[0])
+	videoTitle := SanitizeFilename(lines[0]) + "-1080.mp4"
 	videoURL := lines[1]
+	audioURL := lines[2]
 
 	slog.Debug("video title sanitization", "before:", lines[0], "after:", videoTitle)
 
@@ -49,9 +55,10 @@ func BuildClipDownloadCommand(videoUrl, clipStart, clipEnd string) (*exec.Cmd, s
 	// Prepare the command to download the video clip
 	ffmpegCmd := exec.Command(
 		"./ffmpeg",
-		"-ss", clipStart,
+		"-ss", videoRequest.ClipStart,
 		"-i", videoURL,
-		"-to", clipEnd,
+		"-i", audioURL,
+		"-to", videoRequest.ClipEnd,
 		"-progress", "pipe:1",
 		"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time).
 		downloadPath,
@@ -63,7 +70,7 @@ func BuildClipDownloadCommand(videoUrl, clipStart, clipEnd string) (*exec.Cmd, s
 // download the clip and return the file name and a channel to share the progress
 func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, error) {
 
-	command, title, err := BuildClipDownloadCommand(videoRequest.VideoURL, videoRequest.ClipStart, videoRequest.ClipEnd)
+	command, title, err := BuildClipDownloadCommand(videoRequest)
 
 	if err != nil {
 		return "", nil, err
