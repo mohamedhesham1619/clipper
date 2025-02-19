@@ -19,7 +19,7 @@ import (
 func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
 
 	// Get both the URL and the title with the extension
-	cmd := exec.Command("./yt-dlp",
+	cmd := exec.Command("/tmp/yt-dlp",
 		"-f", "bestvideo[height<=1080]+bestaudio",
 		"--get-title",       // Get the video title
 		"--get-url",         // Get video and audio URLs
@@ -54,7 +54,7 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 
 	// Prepare the command to download the video clip
 	ffmpegCmd := exec.Command(
-		"./ffmpeg",
+		"/tmp/ffmpeg",
 		"-ss", videoRequest.ClipStart,
 		"-i", videoURL,
 		"-i", audioURL,
