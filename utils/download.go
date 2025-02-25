@@ -11,16 +11,12 @@ import (
 	"strings"
 )
 
-// ==============================================================|
-// TODO: MAKE THE OPTION TO DOWNLOAD 360, 460, 720, 1080 QULAITY |
-// ==============================================================|
-
 // prepare the command to download the clip of the video
 func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
 
-	// Get both the URL and the title with the extension
-	cmd := exec.Command("/tmp/yt-dlp",
-		"-f", "bestvideo[height<=1080]+bestaudio",
+	// Get both the URL and the title of the video
+	cmd := exec.Command("yt-dlp",
+		"-f", fmt.Sprintf("bestvideo[height<=%v]+bestaudio", videoRequest.Quality),
 		"--get-title",       // Get the video title
 		"--get-url",         // Get video and audio URLs
 		"--encoding", "UTF-8",
@@ -43,7 +39,7 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 		return nil, "", fmt.Errorf("expected both URL and title but got: %v", lines)
 	}
 
-	videoTitle := SanitizeFilename(lines[0]) + "-1080.mp4"
+	videoTitle := SanitizeFilename(lines[0]) + fmt.Sprintf("-%vp.mp4", videoRequest.Quality)
 	videoURL := lines[1]
 	audioURL := lines[2]
 
@@ -54,7 +50,7 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 
 	// Prepare the command to download the video clip
 	ffmpegCmd := exec.Command(
-		"/tmp/ffmpeg",
+		"ffmpeg",
 		"-ss", videoRequest.ClipStart,
 		"-i", videoURL,
 		"-i", audioURL,

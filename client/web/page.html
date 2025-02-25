@@ -78,7 +78,8 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 1rem;
-            align-items: flex-start; /* Ensure top alignment */
+            align-items: flex-start;
+            /* Ensure top alignment */
         }
 
         .time-input {
@@ -177,12 +178,15 @@
 
         .actions {
             margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;  /* Align items to bottom */
         }
 
         .download-btn {
-            width: 100%;
-            padding: 0.75rem;
-            background: #2d3748;
+            flex: 1;
+            background: #1a202c;  /* Darker black */
+            padding: 0.75rem 1.5rem;
             color: white;
             border: none;
             border-radius: 4px;
@@ -191,6 +195,47 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            height: 56px;  /* Increased height further */
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.2;  /* Increased line height */
+        }
+
+        .quality-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .quality-label {
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .quality-select {
+            padding: 0.75rem;
+            background: #4a5568;  /* Different color from download button */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-width: 100px;
+            text-align: center;
+            font-size: 1rem;
+            height: 56px;  /* Increased height to match */
+            line-height: 1.2;  /* Increased line height */
+            padding-top: 0;    /* Adjust padding */
+            padding-bottom: 0; /* Adjust padding */
+        }
+
+        @media screen and (max-width: 768px) {
+            .actions {
+                align-items: stretch;
+            }
+            
+            .quality-wrapper {
+                width: 100%;
+            }
         }
 
         .duration-display {
@@ -277,13 +322,17 @@
             }
 
             .time-controls {
-                gap: 1.5rem;  /* Add space between time inputs on mobile */
+                gap: 1.5rem;
+                /* Add space between time inputs on mobile */
             }
 
             .time-input {
-                width: 47%;  /* Slightly reduce width to prevent wrapping */
-                margin: 0; /* Remove any default margins */
-                padding: 0; /* Remove any default padding */
+                width: 47%;
+                /* Slightly reduce width to prevent wrapping */
+                margin: 0;
+                /* Remove any default margins */
+                padding: 0;
+                /* Remove any default padding */
             }
 
             .url-input {
@@ -323,7 +372,8 @@
                     <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
                         name="videoUrl">
                     <button type="button" class="paste-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                         </svg>
@@ -347,13 +397,23 @@
 
                 <div class="actions">
                     <button type="submit" class="download-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
                         Download Clip
                     </button>
+                    <div class="quality-wrapper">
+                        <label class="quality-label">Video Quality</label>
+                        <select class="quality-select" id="videoQuality">
+                            <option value="360">360p</option>
+                            <option value="480">480p</option>
+                            <option value="720" selected>720p</option>
+                            <option value="1080">1080p</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-bar-label">
@@ -489,6 +549,7 @@
             const videoUrl = document.getElementById('videoUrl').value.trim();
             const clipStart = document.getElementById('startTime').value;
             const clipEnd = document.getElementById('endTime').value;
+            const quality = document.getElementById('videoQuality').value;
 
             // Validate URL
             if (!videoUrl) {
@@ -507,7 +568,9 @@
             progressValue.textContent = 'Connecting...';
             progressLabel.textContent = 'Initializing';
 
-            const socket = new WebSocket(`wss://${window.location.hostname}/submit`);
+            const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+            const socket = new WebSocket(`${protocol}://${window.location.host}/submit`);
+
             socket.onopen = () => {
                 console.log('Connected to server');
                 progressLabel.textContent = 'Connected';
@@ -517,7 +580,8 @@
                 socket.send(JSON.stringify({
                     videoUrl,
                     clipStart,
-                    clipEnd
+                    clipEnd,
+                    quality
                 }));
             };
             socket.onmessage = async (event) => {

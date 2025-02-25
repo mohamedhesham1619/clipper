@@ -10,4 +10,5 @@ type VideoRequest struct {
 	VideoURL     string `json:"videoUrl"`
 	ClipStart string `json:"clipStart"`
 	ClipEnd string `json:"clipEnd"`
+	Quality string `json:"quality"`
 }

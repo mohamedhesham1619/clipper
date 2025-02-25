@@ -1,0 +1,6 @@
+*.exe
+.gitattributes
+.gitignore
+*.PNG
+Dockerfile
+.dockerignore
