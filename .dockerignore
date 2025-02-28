@@ -4,3 +4,4 @@
 *.PNG
 Dockerfile
 .dockerignore
+*.tar

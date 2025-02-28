@@ -4,6 +4,7 @@ import (
 	"clipper/models"
 	"clipper/utils"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,57 +14,86 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
 
 // store the file IDs and their corresponding file names
 var fileIDs = make(map[string]string)
 
+// store the progress channels for each download process
+var progressTracker = make(map[string]chan models.ProgressResponse)
+
 func submitHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Upgrade the HTTP connection to a WebSocket connection
-	connec, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		slog.Error("Error upgrading connection", "error", err)
-		return
-	}
-
-	// ensure the connection is closed when the function returns
-	defer connec.Close()
-
-	// Read the request videoRequest from the client
+	// Read the request from the client
 	var videoRequest models.VideoRequest
+	json.NewDecoder(r.Body).Decode(&videoRequest)
 
-	connec.ReadJSON(&videoRequest)
 	slog.Info("Received request", "data", videoRequest)
 
-	// Download the video clip
+	// Start the download process
 	fileName, progressChannel, err := utils.DownloadVideo(videoRequest)
 
-	if err != nil {
-		connec.WriteJSON(models.ProgressResponse{Status: "error"})
-		slog.Error("Error downloading video", "error", err, "request", videoRequest)
-		return
+	type response struct {
+		Status    string `json:"status"`
+		ProcessId string `json:"processId"`
 	}
 
-	// listen to progress channel and write the received message over the web socket
-	for response := range progressChannel {
-		connec.WriteJSON(response)
+	if err != nil {
+
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response{Status: "error", ProcessId: ""})
+		slog.Error("Error downloading video", "error", err, "request", videoRequest)
+		return
 	}
 
 	// Generate a unique ID for the file and store it
 	fileId := utils.GenerateID()
 	fileIDs[fileId] = fileName
+	progressTracker[fileId] = progressChannel
 
-	connec.WriteJSON(models.ProgressResponse{Status: "finished", Progress: 100, DownloadUrl: fmt.Sprintf("/download/%v", fileId)})
+	json.NewEncoder(w).Encode(response{Status: "started", ProcessId: fileId})
 
-	slog.Info("process complete", "fileId", fileId, "fileName", fileName, "downloadUrl", fmt.Sprintf("/download/%v", fileId))
+	slog.Info("process started", "fileId", fileId, "fileName", fileName)
 
+}
+
+func progressHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Get the process ID from the URL
+	processId := strings.TrimPrefix(r.URL.Path, "/progress/")
+
+	// Get the progress channel
+	progressChannel, exists := progressTracker[processId]
+
+	if !exists {
+		http.Error(w, "Process not found", http.StatusNotFound)
+		slog.Error("Process not found", "processId", processId)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	for progress := range progressChannel {
+		// Format as proper SSE message
+		fmt.Fprintf(w, "data: %v\n\n", string(must(json.Marshal(progress))))
+		w.(http.Flusher).Flush()
+	}
+	// Send final message
+	fmt.Fprintf(w, "data: %v\n\n", string(must(json.Marshal(models.ProgressResponse{
+		Status:      "finished",
+		Progress:    100,
+		DownloadUrl: fmt.Sprintf("/download/%v", processId),
+	}))))
+}
+
+// Helper function for json.Marshal
+func must(data []byte, err error) []byte {
+	if err != nil {
+		return []byte("{}")
+	}
+	return data
 }
 
 //go:embed client/web/page.html

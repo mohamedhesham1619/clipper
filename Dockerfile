@@ -14,8 +14,10 @@ WORKDIR /app
 
 COPY --from=builder /app/app .
 
-RUN mkdir -p temp
+RUN mkdir -p /app/temp && chmod 777 /app/temp
 
 RUN apk add --no-cache yt-dlp ffmpeg
+
+EXPOSE 8080
 
 CMD ["./app"]

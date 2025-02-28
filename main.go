@@ -16,6 +16,8 @@ func main() {
 
 	mux.HandleFunc("/download/", downloadHandler)
 
+	mux.HandleFunc("/progress/", progressHandler)
+
 	server := http.Server{Handler: mux, Addr: ":8080"}
 
 	// Start the server

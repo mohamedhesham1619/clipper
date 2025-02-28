@@ -551,7 +551,6 @@
             const clipEnd = document.getElementById('endTime').value;
             const quality = document.getElementById('videoQuality').value;
 
-            // Validate URL
             if (!videoUrl) {
                 alert('Please enter a video URL');
                 return;
@@ -562,70 +561,77 @@
             const progressValue = document.querySelector('.progress-value');
             const progressLabel = document.querySelector('.progress-bar-label span:first-child');
 
-            // Show connecting state immediately
+            // Show connecting state
             progressBar.style.display = 'block';
             progressFill.classList.add('connecting');
             progressValue.textContent = 'Connecting...';
             progressLabel.textContent = 'Initializing';
 
-            const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-            const socket = new WebSocket(`${protocol}://${window.location.host}/submit`);
+            try {
+                // Submit request
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        videoUrl,
+                        clipStart,
+                        clipEnd,
+                        quality: quality
+                    })
+                });
 
-            socket.onopen = () => {
-                console.log('Connected to server');
-                progressLabel.textContent = 'Connected';
-                progressValue.textContent = 'Starting';
-                progressValue.classList.add('loading');
-                // Send separate start and end times
-                socket.send(JSON.stringify({
-                    videoUrl,
-                    clipStart,
-                    clipEnd,
-                    quality
-                }));
-            };
-            socket.onmessage = async (event) => {
-                console.log('Message from server:', event.data);
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.status === 'error') {
-                        alert(data.message || 'Failed to process video');
-                        progressFill.classList.remove('connecting');
-                        progressFill.style.width = '0%';
-                        progressLabel.textContent = 'Error';
-                        progressValue.textContent = data.message || 'Failed to process video';
-                        progressValue.style.color = '#dc2626'; // Red color for error
-                    } else if (data.status === 'in_progress') {
-                        progressValue.classList.remove('loading'); // Remove loading animation
-                        progressFill.classList.remove('connecting');
-                        progressFill.style.width = `${data.progress}%`;
-                        progressValue.textContent = `${Math.round(data.progress)}%`;
-                        progressLabel.textContent = 'Processing Clip';
-                    } else if (data.status === 'finished') {
-                        progressFill.classList.remove('connecting');
-                        progressFill.style.width = '100%';
-                        progressLabel.textContent = 'Processing Complete';
-                        progressValue.textContent = 'Download starting...';
-                        setTimeout(() => {
-                            window.location.href = data.downloadUrl;
-                        }, 1000);
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to process server response');
-                    progressLabel.textContent = 'Error';
-                    progressValue.textContent = 'Something went wrong';
-                    progressValue.style.color = '#dc2626';
+                const data = await response.json();
+
+                if (data.status === 'error') {
+                    throw new Error(data.message || 'Failed to process video');
                 }
-            };
 
-            socket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                alert('Failed to connect to server');
-                progressLabel.textContent = 'Connection Error';
-                progressValue.textContent = 'Failed to connect to server';
+                // Connect to SSE endpoint for progress updates
+                const eventSource = new EventSource(`/progress/${data.processId}`);
+                
+                eventSource.addEventListener('message', (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('Progress data:', data); // Debug log
+                        
+                        if (data.status === 'error') {
+                            alert(data.message || 'Failed to process video');
+                            progressFill.classList.remove('connecting');
+                            progressFill.style.width = '0%';
+                            progressLabel.textContent = 'Error';
+                            progressValue.textContent = data.message || 'Failed to process video';
+                            progressValue.style.color = '#dc2626';
+                            eventSource.close();
+                        } else if (data.status === 'in_progress') {
+                            progressFill.classList.remove('connecting');
+                            progressFill.style.width = `${data.progress}%`;
+                            progressValue.textContent = `${Math.round(data.progress)}%`;
+                            progressLabel.textContent = 'Processing Clip';
+                        } else if (data.status === 'finished') {
+                            progressFill.classList.remove('connecting');
+                            progressFill.style.width = '100%';
+                            progressLabel.textContent = 'Processing Complete';
+                            progressValue.textContent = 'Download starting...';
+                            eventSource.close();
+                            setTimeout(() => {
+                                window.location.href = data.downloadUrl;
+                            }, 1000);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing SSE message:', error, event.data);
+                    }
+                });
+
+            } catch (error) {
+                alert(error.message);
+                progressFill.classList.remove('connecting');
+                progressFill.style.width = '0%';
+                progressLabel.textContent = 'Error';
+                progressValue.textContent = error.message;
                 progressValue.style.color = '#dc2626';
-            };
+            }
         });
     </script>
 </body>
