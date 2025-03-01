@@ -16,6 +16,18 @@ import (
 	"time"
 )
 
+//go:embed client/web/page.html
+var content embed.FS
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := content.ReadFile("client/web/page.html")
+	if err != nil {
+		http.Error(w, "Error reading file", http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
 // store the file IDs and their corresponding file names
 var fileIDs = make(map[string]string)
 
@@ -76,36 +88,17 @@ func progressHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	for progress := range progressChannel {
-		// Format as proper SSE message
-		fmt.Fprintf(w, "data: %v\n\n", string(must(json.Marshal(progress))))
+
+		fmt.Fprintf(w, "data: %v\n\n", progress)
 		w.(http.Flusher).Flush()
 	}
+
 	// Send final message
-	fmt.Fprintf(w, "data: %v\n\n", string(must(json.Marshal(models.ProgressResponse{
+	fmt.Fprintf(w, "data: %v\n\n", models.ProgressResponse{
 		Status:      "finished",
 		Progress:    100,
 		DownloadUrl: fmt.Sprintf("/download/%v", processId),
-	}))))
-}
-
-// Helper function for json.Marshal
-func must(data []byte, err error) []byte {
-	if err != nil {
-		return []byte("{}")
-	}
-	return data
-}
-
-//go:embed client/web/page.html
-var content embed.FS
-
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := content.ReadFile("client/web/page.html")
-	if err != nil {
-		http.Error(w, "Error reading file", http.StatusInternalServerError)
-		return
-	}
-	w.Write(data)
+	})
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +144,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// delete the file after a certain time
 	go func() {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(5 * time.Minute)
 		delete(fileIDs, fileId)
 		os.Remove(filePath)
 	}()

@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// prepare the command to download the clip of the video
+// get the title of the video and prepare the command to download the clip
 func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
 
 	// Get both the URL and the title of the video
