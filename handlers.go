@@ -121,7 +121,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// delete the file after a certain time
 	go func() {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(5 * time.Minute)
 		delete(fileIDs, fileId)
 		os.Remove(filePath)
 	}()

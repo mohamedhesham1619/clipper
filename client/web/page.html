@@ -284,65 +284,42 @@
         }
 
         .page-wrapper {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
+            display: block;
             padding: 0 1rem;
-            max-width: 1600px;
-            margin: 0 auto;
         }
 
         .ad-container {
-            width: 160px;
-            min-height: 600px;
-            background: #e2e8f0;
-            border: 2px dashed #94a3b8;
-            border-radius: 8px;
-            margin-top: 2rem;
-            position: sticky;
-            top: 2rem;
             display: none;
-            text-align: center;
-            padding: 1rem;
-            color: #64748b;
         }
 
-        /* Responsive styles */
         @media screen and (min-width: 1200px) {
-            .ad-container {
-                display: block;
+            .container {
+                margin: 2rem auto;
             }
         }
 
-        @media screen and (max-width: 768px) {
-            .container {
-                margin: 0;
-                border-radius: 0;
-                padding: 1rem;
-            }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
 
-            .time-controls {
-                gap: 1.5rem;
-                /* Add space between time inputs on mobile */
-            }
+        .loading-circle {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #4a5568;
+            border-top-color: transparent;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: rotate 1s linear infinite;
+            vertical-align: middle;
+        }
 
-            .time-input {
-                width: 47%;
-                /* Slightly reduce width to prevent wrapping */
-                margin: 0;
-                /* Remove any default margins */
-                padding: 0;
-                /* Remove any default padding */
-            }
-
-            .url-input {
-                flex-direction: column;
-            }
-
-            .paste-btn {
-                width: 100%;
-                margin-top: 0.5rem;
-            }
+        .connecting-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4a5568;
         }
     </style>
 </head>
@@ -351,19 +328,17 @@
     <header class="header">
         <div class="logo">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                <line x1="7" y1="2" x2="7" y2="22"></line>
-                <line x1="17" y1="2" x2="17" y2="22"></line>
+                <circle cx="6" cy="6" r="3"/>
+                <circle cx="6" cy="18" r="3"/>
+                <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+                <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+                <line x1="8.12" y1="8.12" x2="12" y2="12"/>
             </svg>
-            VideoClipper
+            Video Clipper
         </div>
     </header>
 
     <div class="page-wrapper">
-        <aside class="ad-container">
-            Advertisement Space
-        </aside>
-
         <main class="container">
             <h1>Create Your Video Clip</h1>
 
@@ -374,8 +349,11 @@
                     <button type="button" class="paste-btn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            <path d="M14 15h-4"></path>
+                            <path d="M14 11h-4"></path>
+                            <path d="M14 19h-4"></path>
                         </svg>
                     </button>
                 </div>
@@ -427,10 +405,6 @@
 
             </form>
         </main>
-
-        <aside class="ad-container">
-            Advertisement Space
-        </aside>
     </div>
 
     <script>
@@ -562,11 +536,16 @@
             const progressValue = document.querySelector('.progress-value');
             const progressLabel = document.querySelector('.progress-bar-label span:first-child');
 
-            // Show connecting state immediately
+            // Show connecting state with loading circle
             progressBar.style.display = 'block';
             progressFill.classList.add('connecting');
-            progressValue.textContent = 'Connecting...';
-            progressLabel.textContent = 'Initializing';
+            progressValue.textContent = '';
+            progressLabel.innerHTML = `
+                <span class="connecting-text">
+                    <span class="loading-circle"></span>
+                    <span>Connecting to server</span>
+                </span>
+            `;
 
             const protocol = window.location.protocol === "https:" ? "wss" : "ws";
             const socket = new WebSocket(`${protocol}://${window.location.host}/submit`);
