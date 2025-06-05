@@ -14,17 +14,17 @@ import (
 // prepare the command to download the clip of the video
 func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
 
-	// Get both the URL and the title of the video
 	cmd := exec.Command("yt-dlp",
-		"-f", fmt.Sprintf("bestvideo[height<=%v]+bestaudio", videoRequest.Quality),
-		"--get-title",       // Get the video title
-		"--get-url",         // Get video and audio URLs
-		"--encoding", "UTF-8",
+		"-f", "bv*+ba/b/best",
+		"--print", "%(title).244s.%(ext)s\n%(urls)s",
+		"--encoding", "utf-8",
+		"--no-playlist",
 		"--no-download",
+		"--no-warnings",
 		videoRequest.VideoURL,
 	)
 
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 
 	if err != nil {
 
@@ -34,31 +34,53 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 	// Split output into lines
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 
-	if len(lines) < 3 {
+	if len(lines) < 2 {
 
 		return nil, "", fmt.Errorf("expected both URL and title but got: %v", lines)
 	}
 
-	videoTitle := SanitizeFilename(lines[0]) + fmt.Sprintf("-%vp.mp4", videoRequest.Quality)
-	videoURL := lines[1]
-	audioURL := lines[2]
+	videoTitle := SanitizeFilename(lines[0])
+	clipDuration, err := ParseClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
 
-	slog.Debug("video title sanitization", "before:", lines[0], "after:", videoTitle)
+	if err != nil {
+		return nil, "", fmt.Errorf("error parsing clip duration: %v", err)
+	}
 
 	// Get the absolute path to the download directory
 	downloadPath, _ := filepath.Abs(fmt.Sprintf("temp/%v", videoTitle))
 
-	// Prepare the command to download the video clip
-	ffmpegCmd := exec.Command(
-		"ffmpeg",
-		"-ss", videoRequest.ClipStart,
-		"-i", videoURL,
-		"-i", audioURL,
-		"-to", videoRequest.ClipEnd,
-		"-progress", "pipe:1",
-		"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time).
-		downloadPath,
-	)
+	var ffmpegCmd *exec.Cmd
+
+	// If yt-dlp returns separate URLs for audio and video
+	if len(lines) > 2 {
+
+		videoURL := lines[1]
+		audioURL := lines[2]
+
+		ffmpegCmd = exec.Command(
+			"ffmpeg",
+			"-ss", videoRequest.ClipStart,
+			"-i", videoURL,
+			"-ss", videoRequest.ClipStart,
+			"-i", audioURL,
+			"-t", clipDuration,
+			"-progress", "pipe:1",
+			"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time).
+			downloadPath,
+		)
+	} else { // If yt-dlp returns a single URL (video + audio combined)
+		url := lines[1]
+
+		ffmpegCmd = exec.Command(
+			"ffmpeg",
+			"-ss", videoRequest.ClipStart,
+			"-i", url,
+			"-t", clipDuration,
+			"-progress", "pipe:1",
+			"-c", "copy",
+			downloadPath,
+		)
+	}
 
 	return ffmpegCmd, videoTitle, nil
 }
@@ -99,7 +121,8 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 				outTime, err := strconv.ParseInt(strings.Split(line, "=")[1], 10, 64)
 
 				if err != nil {
-					slog.Error(fmt.Sprintf("error reading out_time_ms value from downloading command output: %v", err))
+					slog.Error(fmt.Sprintf("error reading out_time_ms value from downloading command output: %v \n command output: %v", err, line))
+					continue
 				}
 
 				// Convert to float64 to avoid integer division truncation and get precise percentage

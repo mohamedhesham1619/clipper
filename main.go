@@ -11,7 +11,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", homeHandler)
-	
+
 	mux.HandleFunc("/submit", submitHandler)
 
 	mux.HandleFunc("/download/", downloadHandler)
