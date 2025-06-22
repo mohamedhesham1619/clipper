@@ -9,14 +9,12 @@ import (
 )
 
 func GenerateID() string {
-
 	randNum := rand.Int32N(10000)
 	return fmt.Sprintf("%d%d", time.Now().UnixNano(), randNum)
 }
 
 // sanitize the filename to remove or replace characters that are problematic in filenames
 func SanitizeFilename(filename string) string {
-
 	replacements := map[rune]rune{
 		'/':  '-',
 		'\\': '-',
@@ -45,7 +43,6 @@ func SanitizeFilename(filename string) string {
 
 // calculate the clip duration in microseconds
 func calculateClipDuration(start, end string) (int64, error) {
-
 	layout := "15:04:05"
 	startTime, err := time.Parse(layout, start)
 
@@ -60,14 +57,11 @@ func calculateClipDuration(start, end string) (int64, error) {
 	}
 
 	return endTime.Sub(startTime).Microseconds(), nil
-
 }
 
 // parse clip timing info.
 // for ffmpeg to accurately extract the needed clip, it needs the start time and clip duration in seconds
 func ParseClipDuration(startTime, endTime string) (duration string, err error) {
-	
-
 	layout := "15:04:05"
 
 	t1, err := time.Parse(layout, startTime)
@@ -88,4 +82,3 @@ func ParseClipDuration(startTime, endTime string) (duration string, err error) {
 
 	return duration, nil
 }
-

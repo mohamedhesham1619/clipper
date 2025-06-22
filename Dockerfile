@@ -1,3 +1,4 @@
+# Build stage
 FROM golang:1.22-alpine as builder
 
 WORKDIR /app
@@ -8,6 +9,7 @@ RUN go mod download
 
 RUN go build -o app .
 
+# Final stage
 FROM alpine:latest
 
 WORKDIR /app
