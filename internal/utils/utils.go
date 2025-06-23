@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"time"
 	"unicode"
 )
@@ -60,4 +61,28 @@ func calculateClipDuration(start, end string) (int64, error) {
 
 	return endTime.Sub(startTime).Microseconds(), nil
 
+}
+
+// parse clip timing info.
+// for ffmpeg to accurately extract the needed clip, it needs the start time and clip duration in seconds
+func ParseClipDuration(startTime, endTime string) (duration string, err error) {
+	layout := "15:04:05"
+
+	t1, err := time.Parse(layout, startTime)
+	if err != nil {
+		return "", fmt.Errorf("invalid start time: %v", err)
+	}
+
+	t2, err := time.Parse(layout, endTime)
+	if err != nil {
+		return "", fmt.Errorf("invalid end time: %v", err)
+	}
+
+	// Calculate duration in seconds
+	durationSeconds := int(t2.Sub(t1).Seconds())
+
+	// Convert duration to string
+	duration = strconv.Itoa(durationSeconds)
+
+	return duration, nil
 }

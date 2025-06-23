@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Clipper</title>
+    <title>VideoClipper</title>
     <style>
         * {
             margin: 0;
@@ -133,14 +133,6 @@
             display: none;
             /* Initially hidden */
             margin: 2rem 0;
-            transition: all 0.3s ease;
-            opacity: 0;
-            transform: translateY(10px);
-        }
-
-        .progress-bar.visible {
-            opacity: 1;
-            transform: translateY(0);
         }
 
         .progress-bar-label {
@@ -292,17 +284,18 @@
         }
 
         .page-wrapper {
-            display: block;  /* Changed from flex */
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
             padding: 0 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
-        .ad-container {
-            display: none;  /* Hide ads completely */
-        }
-
+        /* Responsive styles */
         @media screen and (min-width: 1200px) {
-            .container {
-                margin: 2rem auto;  /* Center container */
+            .ad-container {
+                display: block;
             }
         }
 
@@ -336,43 +329,6 @@
                 margin-top: 0.5rem;
             }
         }
-
-        .initializing {
-            position: relative;
-            display: inline-block;
-        }
-
-        .initializing::after {
-            content: '';
-            position: absolute;
-            display: inline-block;
-            animation: ellipsis 1.5s infinite;
-            margin-left: 2px;
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-circle {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #4a5568;
-            border-top-color: transparent;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: rotate 1s linear infinite;
-            vertical-align: middle;
-        }
-
-        .connecting-text {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #4a5568;
-        }
     </style>
 </head>
 
@@ -380,13 +336,11 @@
     <header class="header">
         <div class="logo">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="6" cy="6" r="3"/>
-                <circle cx="6" cy="18" r="3"/>
-                <line x1="20" y1="4" x2="8.12" y2="15.88"/>
-                <line x1="14.47" y1="14.48" x2="20" y2="20"/>
-                <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                <line x1="7" y1="2" x2="7" y2="22"></line>
+                <line x1="17" y1="2" x2="17" y2="22"></line>
             </svg>
-            Video Clipper
+            VideoClipper
         </div>
     </header>
 
@@ -399,12 +353,10 @@
                     <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
                         name="videoUrl">
                     <button type="button" class="paste-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            <path d="M14 15h-4"></path>
-                            <path d="M14 11h-4"></path>
-                            <path d="M14 19h-4"></path>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                         </svg>
                     </button>
                 </div>
@@ -586,17 +538,11 @@
             const progressValue = document.querySelector('.progress-value');
             const progressLabel = document.querySelector('.progress-bar-label span:first-child');
 
-            // Show connecting state with loading circle, but without the connecting text at the end
+            // Show connecting state
             progressBar.style.display = 'block';
-            setTimeout(() => progressBar.classList.add('visible'), 10);
             progressFill.classList.add('connecting');
-            progressValue.textContent = ''; // Remove the connecting text
-            progressLabel.innerHTML = `
-                <span class="connecting-text">
-                    <span class="loading-circle"></span>
-                    <span>Connecting to server</span>
-                </span>
-            `;
+            progressValue.textContent = 'Connecting...';
+            progressLabel.textContent = 'Initializing';
 
             try {
                 // Submit request
@@ -646,9 +592,13 @@
                             progressLabel.textContent = 'Processing Complete';
                             progressValue.textContent = 'Download starting...';
                             eventSource.close();
-                            setTimeout(() => {
-                                window.location.href = data.downloadUrl;
-                            }, 1000);
+                            // Trigger download prompt
+                            const a = document.createElement('a');
+                            a.href = data.downloadUrl;
+                            a.download = '';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
                         }
                     } catch (error) {
                         console.error('Error parsing SSE message:', error, event.data);
@@ -657,8 +607,6 @@
 
             } catch (error) {
                 alert(error.message);
-                progressBar.classList.remove('visible');
-                setTimeout(() => progressBar.style.display = 'none', 300);
                 progressFill.classList.remove('connecting');
                 progressFill.style.width = '0%';
                 progressLabel.textContent = 'Error';
