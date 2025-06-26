@@ -1,4 +1,5 @@
-FROM golang:1.22-alpine as builder
+# Build stage
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -6,18 +7,15 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -o app .
+RUN go build -o bin/clipper ./cmd/clipper
 
+# Final stage
 FROM alpine:latest
 
-WORKDIR /app
+WORKDIR /clipper
 
-COPY --from=builder /app/app .
-
-RUN mkdir -p /app/temp && chmod 777 /app/temp
+COPY --from=builder /app/bin/clipper .
 
 RUN apk add --no-cache yt-dlp ffmpeg
 
-EXPOSE 8080
-
-CMD ["./app"]
+CMD ["./clipper"]

@@ -5,4 +5,4 @@
 Dockerfile
 .dockerignore
 *.tar
-build/
+/build
