@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"clipper/web"
+	"clipper/internal/web"
 	"net/http"
 )
 

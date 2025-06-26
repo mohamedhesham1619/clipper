@@ -18,8 +18,7 @@ var FileIDs = make(map[string]string)
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the file ID from the URL
 	fileId := strings.TrimPrefix(r.URL.Path, "/download/")
-	slog.Info("received download request", "fileId", fileId)
-
+	
 	// Get the file name from the map if it exists
 	fileName, exists := FileIDs[fileId]
 	if !exists {

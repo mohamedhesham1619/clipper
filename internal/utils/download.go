@@ -5,6 +5,7 @@ import (
 	"clipper/internal/models"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -40,10 +41,17 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 		return nil, "", fmt.Errorf("error parsing clip duration: %v", err)
 	}
 
+	// create the download directory if it doesn't exist
+	err = os.MkdirAll("temp", 0755)
+	if err != nil {
+		return nil, "", fmt.Errorf("error creating download directory: %v", err)
+	}
+
 	// Get the absolute path to the download directory
 	downloadPath, _ := filepath.Abs(fmt.Sprintf("temp/%v", videoTitle))
 
 	var ffmpegCmd *exec.Cmd
+
 	// If yt-dlp returns separate URLs for audio and video
 	if len(lines) > 2 {
 		videoURL := lines[1]
@@ -57,7 +65,7 @@ func BuildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 			"-i", audioURL,
 			"-t", clipDuration,
 			"-progress", "pipe:1",
-			"-c", "copy", // Copy without re-encoding (fast and decrease the cpu usage but the clip may not start at the exact time)
+			"-c", "copy", // Copy without re-encoding (fast but the clip may not start at the exact time)
 			downloadPath,
 		)
 	} else { // If yt-dlp returns a single URL (video + audio combined)

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"time"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -29,8 +28,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	// Read the request videoRequest from the client
 	var videoRequest models.VideoRequest
 	connec.ReadJSON(&videoRequest)
-	slog.Info("Received request", "data", videoRequest)
-
+	
 	// Download the clip
 	fileName, progressChannel, err := utils.DownloadVideo(videoRequest)
 	if err != nil {
@@ -53,9 +51,6 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		Progress:    100,
 		DownloadUrl: fmt.Sprintf("/download/%v", fileId),
 	})
-
-	slog.Info("process complete", "fileId", fileId, "fileName", fileName,
-		"downloadUrl", fmt.Sprintf("/download/%v", fileId))
 
 	// delete the file after a certain time
 	go func() {
