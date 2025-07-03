@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"clipper/internal/models"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -12,166 +13,142 @@ import (
 	"strings"
 )
 
-// get the title of the video and prepare the command to download the clip
-func buildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, string, error) {
+// DownloadVideo downloads the video and returns the output file path, a progress channel, and the ffmpeg command.
+func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, *exec.Cmd, error) {
 
-	// Get the video title, video url, and audio url with the desired quality using yt-dlp
-	cmd := exec.Command("yt-dlp",
+	// 1. Get video title to determine output filename.
+	// This is a quick, separate command to avoid mixing its output with the video stream.
+	infoCmd := exec.Command("yt-dlp",
 		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
-		"--print", "%(title)s-%(height)sp.%(ext)s\n%(urls)s",
-		"--encoding", "utf-8",
+		"--print", "%(title)s-%(height)sp.%(ext)s",
 		"--no-playlist",
 		"--no-download",
 		"--no-warnings",
 		videoRequest.VideoURL,
 	)
-
-	output, err := cmd.CombinedOutput()
+	infoOutput, err := infoCmd.CombinedOutput()
 	if err != nil {
-		return nil, "", fmt.Errorf("error getting video info: %v, command: %v, output: %v", err, cmd.String(), string(output))
+		return "", nil, nil, fmt.Errorf("yt-dlp failed to get video info: %w, output: %s", err, string(infoOutput))
 	}
-
-	// Split output into lines
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) < 2 {
-		return nil, "", fmt.Errorf("expected both URL and title but got: %v", lines)
+	if len(infoOutput) == 0 {
+		return "", nil, nil, fmt.Errorf("yt-dlp returned no info for the video")
 	}
+	videoTitle := SanitizeFilename(strings.TrimSpace(string(infoOutput)))
 
-	videoTitle := SanitizeFilename(lines[0])
-	clipDuration, err := ParseClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
-	if err != nil {
-		return nil, "", fmt.Errorf("error parsing clip duration: %v", err)
+	// 2. Prepare paths and directories.
+	if err := os.MkdirAll("temp", os.ModePerm); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-
-	// Create the temp directory if it doesn't exist
-	err = os.MkdirAll("temp", os.ModePerm)
-	if err != nil {
-		return nil, "", fmt.Errorf("error creating temp directory: %v", err)
-	}
-
-	// Get the absolute path to the temp directory
 	downloadPath, _ := filepath.Abs(filepath.Join("temp", videoTitle))
 
-	var ffmpegCmd *exec.Cmd
+	// 3. Prepare yt-dlp command for streaming video data to its stdout.
+	ytdlpCmd := exec.Command("yt-dlp",
+		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
+		"--no-warnings",
+		"-o", "-", // Critical: output to stdout
+		videoRequest.VideoURL,
+	)
 
-	// Construct a single header string to mimic a browser request.
-	// This is more robust than multiple -headers flags and helps avoid 403 errors.
-	// The \r\n is crucial for separating headers.
-	headerString := "User-Agent: Mozilla/5.0\r\n" +
-		"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n" +
-		"Accept-Language: en-US,en;q=0.5\r\n" +
-		"Referer: https://www.google.com/\r\n" // A generic Referer can help with services like Google Drive.
-
-	// If yt-dlp returns separate URLs for audio and video
-	if len(lines) > 2 { // Separate video and audio streams
-		videoURL := lines[1] // URL of the video stream
-		audioURL := lines[2] // URL of the audio stream
-
-		ffmpegCmd = exec.Command(
-			"ffmpeg",
-			"-headers", headerString,
-			"-ss", videoRequest.ClipStart,
-			"-i", videoURL,
-			"-headers", headerString,
-			"-ss", videoRequest.ClipStart,
-			"-i", audioURL,
-			"-t", clipDuration,
-			"-progress", "pipe:1",
-			"-c", "copy", // Copy without re-encoding (fast but the clip may not start at the exact time)
-			downloadPath,
-		)
-	} else { // If yt-dlp returns a single URL (video + audio combined)
-		url := lines[1] // Combined video and audio URL
-		ffmpegCmd = exec.Command(
-			"ffmpeg",
-			"-headers", headerString,
-			"-ss", videoRequest.ClipStart,
-			"-i", url,
-			"-t", clipDuration,
-			"-progress", "pipe:1",
-			"-c", "copy",
-			downloadPath,
-		)
-	}
-
-	return ffmpegCmd, downloadPath, nil
-}
-
-// download the clip and return the file name and a channel to share the progress
-func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, *exec.Cmd, error) {
-
-	command, filePath, err := buildClipDownloadCommand(videoRequest)
-
+	// 4. Prepare ffmpeg command to read from its stdin.
+	clipDuration, err := ParseClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, fmt.Errorf("failed to parse clip duration: %w", err)
+	}
+	ffmpegCmd := exec.Command("ffmpeg",
+		"-hide_banner", // Quieter logs
+		"-ss", videoRequest.ClipStart,
+		"-i", "pipe:0", // Critical: read from stdin
+		"-t", clipDuration,
+		"-progress", "pipe:1", // Progress to stdout
+		"-c", "copy",
+		downloadPath,
+	)
+
+	// 5. Connect yt-dlp's stdout to ffmpeg's stdin.
+	ffmpegCmd.Stdin, err = ytdlpCmd.StdoutPipe()
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to create pipe from yt-dlp to ffmpeg: %w", err)
 	}
 
-	// total time in microseconds
-	// it is required to calculate the progress because ffmpeg returns the output time in microseconds
+	// 6. Set up ffmpeg's stdout for progress and stderr for logs.
 	totalTime, err := calculateClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
-
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error calculating clip duration in microseconds: %v", err)
 	}
+	progressChan := make(chan models.ProgressResponse)
 
-	// Create a pipe to read the command's stdout
-	// This is necessary to capture the progress output from ffmpeg
-	stdoutPipe, err := command.StdoutPipe()
-
+	ffmpegStdout, err := ffmpegCmd.StdoutPipe()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error creating stdout pipe: %v", err)
 	}
+	go readProgress(ffmpegStdout, progressChan, totalTime)
 
-	// Also create a pipe to read stderr for logging purposes. This is crucial for debugging.
-	stderrPipe, err := command.StderrPipe()
+	ffmpegStderr, err := ffmpegCmd.StderrPipe()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error creating stderr pipe: %v", err)
 	}
+	go logPipe(ffmpegStderr, "ffmpeg")
 
-	progressChan := make(chan models.ProgressResponse)
-	scanner := bufio.NewScanner(stdoutPipe)
-
-	// Start a goroutine to log stderr for debugging.
-	// This will show us exactly what ffmpeg is doing or why it's failing.
-	go func() {
-		stderrScanner := bufio.NewScanner(stderrPipe)
-		for stderrScanner.Scan() {
-			// Log ffmpeg's output for debugging. Use Debug level to avoid cluttering logs in production.
-			slog.Debug("ffmpeg", "output", stderrScanner.Text())
-		}
-	}()
-
-	// start listening to stdout pipe
-	// since this is I/O blocking process, it needs to start in a separate goroutine
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			if strings.Contains(line, "out_time_ms") {
-				outTime, err := strconv.ParseInt(strings.Split(line, "=")[1], 10, 64)
-
-				if err != nil {
-					slog.Error("error parsing out_time_ms from ffmpeg", "error", err)
-				}
-
-				// Convert to float64 to avoid integer division truncation and get precise percentage
-				progress := (float64(outTime) / float64(totalTime)) * 100
-
-				progressChan <- models.ProgressResponse{
-					Status:   "in_progress",
-					Progress: int(progress),
-				}
-			}
-		}
-
-	}()
-
-	// run the download command
-	err = command.Start()
-
+	// Also log yt-dlp's stderr for debugging any download-specific issues.
+	ytdlpStderr, err := ytdlpCmd.StderrPipe()
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, fmt.Errorf("error creating yt-dlp stderr pipe: %v", err)
+	}
+	go logPipe(ytdlpStderr, "yt-dlp")
+
+	// 7. Start both commands. Order matters: start the consumer (ffmpeg) before the producer (yt-dlp) to be safe,
+	// although starting yt-dlp first is generally fine as the pipe has a buffer.
+	if err := ytdlpCmd.Start(); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to start yt-dlp: %w", err)
+	}
+	if err := ffmpegCmd.Start(); err != nil {
+		// If ffmpeg fails to start, we must kill the lingering yt-dlp process.
+		_ = ytdlpCmd.Process.Kill()
+		return "", nil, nil, fmt.Errorf("failed to start ffmpeg: %w", err)
 	}
 
-	return filePath, progressChan, command, nil
+	// 8. The caller will Wait() on ffmpeg. We spawn a goroutine to Wait() on yt-dlp
+	// to release its resources once it's done (or killed by a broken pipe).
+	go func() {
+		// A "broken pipe" error is expected if ffmpeg finishes first and closes its stdin.
+		// We can log this at a debug level as it's part of normal operation in this pipeline.
+		if err := ytdlpCmd.Wait(); err != nil {
+			slog.Debug("yt-dlp process finished", "error", err)
+		}
+	}()
+
+	return downloadPath, progressChan, ffmpegCmd, nil
+}
+
+// logPipe reads from a process's output pipe and logs each line for debugging.
+func logPipe(pipe io.ReadCloser, prefix string) {
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		slog.Debug(prefix, "output", scanner.Text())
+	}
+}
+
+// readProgress reads from ffmpeg's progress pipe, parses the progress, and sends it to a channel.
+func readProgress(pipe io.ReadCloser, progressChan chan models.ProgressResponse, totalTime int64) {
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "out_time_ms") {
+			outTime, err := strconv.ParseInt(strings.Split(line, "=")[1], 10, 64)
+
+			if err != nil {
+				slog.Error("error parsing out_time_ms from ffmpeg", "error", err)
+				continue
+			}
+
+			// Convert to float64 to avoid integer division truncation and get precise percentage
+			progress := (float64(outTime) / float64(totalTime)) * 100
+
+			progressChan <- models.ProgressResponse{
+				Status:   "in_progress",
+				Progress: int(progress),
+			}
+		}
+	}
 }
