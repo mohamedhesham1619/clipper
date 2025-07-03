@@ -54,15 +54,25 @@ func buildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 
 	var ffmpegCmd *exec.Cmd
 
+	// Construct a single header string to mimic a browser request.
+	// This is more robust than multiple -headers flags and helps avoid 403 errors.
+	// The \r\n is crucial for separating headers.
+	headerString := "User-Agent: Mozilla/5.0\r\n" +
+		"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n" +
+		"Accept-Language: en-US,en;q=0.5\r\n" +
+		"Referer: https://www.google.com/\r\n" // A generic Referer can help with services like Google Drive.
+
 	// If yt-dlp returns separate URLs for audio and video
-	if len(lines) > 2 {
-		videoURL := lines[1]
-		audioURL := lines[2]
+	if len(lines) > 2 { // Separate video and audio streams
+		videoURL := lines[1] // URL of the video stream
+		audioURL := lines[2] // URL of the audio stream
 
 		ffmpegCmd = exec.Command(
 			"ffmpeg",
+			"-headers", headerString,
 			"-ss", videoRequest.ClipStart,
 			"-i", videoURL,
+			"-headers", headerString,
 			"-ss", videoRequest.ClipStart,
 			"-i", audioURL,
 			"-t", clipDuration,
@@ -71,9 +81,10 @@ func buildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 			downloadPath,
 		)
 	} else { // If yt-dlp returns a single URL (video + audio combined)
-		url := lines[1]
+		url := lines[1] // Combined video and audio URL
 		ffmpegCmd = exec.Command(
 			"ffmpeg",
+			"-headers", headerString,
 			"-ss", videoRequest.ClipStart,
 			"-i", url,
 			"-t", clipDuration,
@@ -83,16 +94,16 @@ func buildClipDownloadCommand(videoRequest models.VideoRequest) (*exec.Cmd, stri
 		)
 	}
 
-	return ffmpegCmd, videoTitle, nil
+	return ffmpegCmd, downloadPath, nil
 }
 
 // download the clip and return the file name and a channel to share the progress
-func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, error) {
+func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, *exec.Cmd, error) {
 
-	command, title, err := buildClipDownloadCommand(videoRequest)
+	command, filePath, err := buildClipDownloadCommand(videoRequest)
 
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	// total time in microseconds
@@ -100,7 +111,7 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	totalTime, err := calculateClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
 
 	if err != nil {
-		return "", nil, fmt.Errorf("error calculating clip duration in microseconds: %v", err)
+		return "", nil, nil, fmt.Errorf("error calculating clip duration in microseconds: %v", err)
 	}
 
 	// Create a pipe to read the command's stdout
@@ -108,11 +119,27 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	stdoutPipe, err := command.StdoutPipe()
 
 	if err != nil {
-		return "", nil, fmt.Errorf("error creating stdout pipe: %v", err)
+		return "", nil, nil, fmt.Errorf("error creating stdout pipe: %v", err)
+	}
+
+	// Also create a pipe to read stderr for logging purposes. This is crucial for debugging.
+	stderrPipe, err := command.StderrPipe()
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("error creating stderr pipe: %v", err)
 	}
 
 	progressChan := make(chan models.ProgressResponse)
 	scanner := bufio.NewScanner(stdoutPipe)
+
+	// Start a goroutine to log stderr for debugging.
+	// This will show us exactly what ffmpeg is doing or why it's failing.
+	go func() {
+		stderrScanner := bufio.NewScanner(stderrPipe)
+		for stderrScanner.Scan() {
+			// Log ffmpeg's output for debugging. Use Debug level to avoid cluttering logs in production.
+			slog.Debug("ffmpeg", "output", stderrScanner.Text())
+		}
+	}()
 
 	// start listening to stdout pipe
 	// since this is I/O blocking process, it needs to start in a separate goroutine
@@ -124,7 +151,7 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 				outTime, err := strconv.ParseInt(strings.Split(line, "=")[1], 10, 64)
 
 				if err != nil {
-					slog.Error(fmt.Sprintf("error reading out_time_ms value from downloading command output: %v", err))
+					slog.Error("error parsing out_time_ms from ffmpeg", "error", err)
 				}
 
 				// Convert to float64 to avoid integer division truncation and get precise percentage
@@ -137,16 +164,14 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 			}
 		}
 
-		// close the channel after the download finish
-		close(progressChan)
 	}()
 
 	// run the download command
 	err = command.Start()
 
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
-	return title, progressChan, nil
+	return filePath, progressChan, command, nil
 }

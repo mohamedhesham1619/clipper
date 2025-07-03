@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"clipper/internal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,8 +13,10 @@ func ProgressHandler(w http.ResponseWriter, r *http.Request) {
 	processId := strings.TrimPrefix(r.URL.Path, "/progress/")
 
 	// Get the progress channel
+	mu.RLock()
 	progressChannel, exists := progressTracker[processId]
-
+	mu.RUnlock()
+	
 	if !exists {
 		http.Error(w, "Process not found", http.StatusNotFound)
 		return
@@ -33,13 +34,4 @@ func ProgressHandler(w http.ResponseWriter, r *http.Request) {
 		w.(http.Flusher).Flush()
 	}
 
-	// Send final message
-	final := models.ProgressResponse{
-		Status:      "finished",
-		Progress:    100,
-		DownloadUrl: fmt.Sprintf("/download/%v", processId),
-	}
-	b, _ := json.Marshal(final)
-	fmt.Fprintf(w, "data: %s\n\n", b)
-	w.(http.Flusher).Flush()
 }

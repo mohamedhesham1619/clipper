@@ -4,6 +4,7 @@ import (
 	"clipper/internal/handlers"
 	"log/slog"
 	"net/http"
+	"os"
 )
 
 type Server struct {
@@ -23,6 +24,10 @@ func New() *Server {
 }
 
 func (s *Server) Start() error {
-	slog.Info("Server started on port 8080")
-	return http.ListenAndServe(":8080", s.mux)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	slog.Info("Server started on port " + port)
+	return http.ListenAndServe(":"+port, s.mux)
 }

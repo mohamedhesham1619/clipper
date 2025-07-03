@@ -4,10 +4,10 @@ import (
 	"clipper/internal/models"
 	"clipper/internal/utils"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -23,7 +23,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&videoRequest)
 
 	// Start the download process
-	fileName, progressChannel, err := utils.DownloadVideo(videoRequest)
+	filePath, progressChannel, cmd, err := utils.DownloadVideo(videoRequest)
 
 	// If there was an error during the download, return an error response
 	if err != nil {
@@ -35,16 +35,61 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique ID for the file and store it
 	fileId := utils.GenerateID()
-	fileIDs[fileId] = fileName
-
-	// Store the progress channel for this file ID
+	
+	mu.Lock()
+	fileIDs[fileId] = filePath
 	progressTracker[fileId] = progressChannel
+	jobStatus[fileId] = "in_progress"
+	mu.Unlock()
 
-	// delete the file after a certain time
+	// In a goroutine, wait for the command to finish and update the job status.
 	go func() {
-		time.Sleep(10 * time.Minute)
-		delete(fileIDs, fileId)
-		os.Remove(filepath.Join("temp", fileName))
+		// Ensure the progress channel is always closed and removed from the tracker when this goroutine exits.
+		defer func() {
+			close(progressChannel)
+			mu.Lock()
+			delete(progressTracker, fileId)
+			mu.Unlock()
+		}()
+
+		// cmd.Wait() blocks until the ffmpeg process is finished.
+		if err := cmd.Wait(); err != nil {
+			// This block runs if ffmpeg fails.
+			slog.Error("ffmpeg process failed", "error", err, "processId", fileId)
+
+			// Send a failure message on the channel before closing it.
+			progressChannel <- models.ProgressResponse{Status: "error"}
+
+			mu.Lock()
+			jobStatus[fileId] = "failed"
+			delete(fileIDs, fileId) // Remove so it can't be downloaded
+			mu.Unlock()
+			os.Remove(filePath) // remove potentially partial file
+			return
+		}
+
+		// This block runs only if ffmpeg succeeds.
+		slog.Info("ffmpeg process finished successfully", "processId", fileId)
+
+		// Send the final success message on the channel before closing it.
+		progressChannel <- models.ProgressResponse{
+			Status:      "finished",
+			Progress:    100,
+			DownloadUrl: fmt.Sprintf("/download/%v", fileId),
+		}
+
+		mu.Lock()
+		jobStatus[fileId] = "completed"
+		mu.Unlock()
+
+		time.AfterFunc(10*time.Minute, func() {
+			slog.Info("Cleaning up old file and status", "processId", fileId, "path", filePath)
+			mu.Lock()
+			delete(fileIDs, fileId)
+			delete(jobStatus, fileId)
+			mu.Unlock()
+			os.Remove(filePath)
+		})
 	}()
 
 	// Respond with the process ID
