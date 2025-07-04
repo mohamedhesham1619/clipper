@@ -16,7 +16,7 @@ import (
 // DownloadVideo downloads the video and returns the output file path, a progress channel, and the ffmpeg command.
 func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, *exec.Cmd, error) {
 
-	// 1. Get video title to determine output filename.
+	// Get video title to determine output filename.
 	// This is a quick, separate command to avoid mixing its output with the video stream.
 	infoCmd := exec.Command("yt-dlp",
 		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
@@ -35,54 +35,55 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	}
 	videoTitle := SanitizeFilename(strings.TrimSpace(string(infoOutput)))
 
-	// 2. Prepare paths and directories.
+	// Create a temp directory if it doesn't exist.
+	// This is where the video will be saved.
 	if err := os.MkdirAll("temp", os.ModePerm); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	downloadPath, _ := filepath.Abs(filepath.Join("temp", videoTitle))
 
-	// 3. Prepare yt-dlp command for streaming video data to its stdout.
+	// Prepare yt-dlp command for streaming video data to its stdout.
 	ytdlpCmd := exec.Command("yt-dlp",
 		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
+		"--download-sections", fmt.Sprintf("*%s-%s", videoRequest.ClipStart, videoRequest.ClipEnd),
 		"--no-warnings",
 		"-o", "-", // Critical: output to stdout
 		videoRequest.VideoURL,
 	)
 
-	// 4. Prepare ffmpeg command to read from its stdin.
-	clipDuration, err := ParseClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to parse clip duration: %w", err)
-	}
+	// Prepare ffmpeg command to read from its stdin.
 	ffmpegCmd := exec.Command("ffmpeg",
 		"-hide_banner", // Quieter logs
-		"-ss", videoRequest.ClipStart,
 		"-i", "pipe:0", // Critical: read from stdin
-		"-t", clipDuration,
 		"-progress", "pipe:1", // Progress to stdout
-		"-c", "copy",
+		"-c", "copy", // Just copy the stream yt-dlp provides.
 		downloadPath,
 	)
 
-	// 5. Connect yt-dlp's stdout to ffmpeg's stdin.
+	// Connect yt-dlp's stdout to ffmpeg's stdin.
 	ffmpegCmd.Stdin, err = ytdlpCmd.StdoutPipe()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to create pipe from yt-dlp to ffmpeg: %w", err)
 	}
 
-	// 6. Set up ffmpeg's stdout for progress and stderr for logs.
+	// Calculate the total clip duration.
+	// This is used to calculate the progress percentage.
 	totalTime, err := calculateClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error calculating clip duration in microseconds: %v", err)
 	}
 	progressChan := make(chan models.ProgressResponse)
 
+	// Create pipes for ffmpeg's output.
+	// This pipe will be used to read progress updates.
 	ffmpegStdout, err := ffmpegCmd.StdoutPipe()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error creating stdout pipe: %v", err)
 	}
 	go readProgress(ffmpegStdout, progressChan, totalTime)
 
+	// This pipe will be used to log ffmpeg's stderr output.
+	// It's useful for debugging any issues with the ffmpeg command.
 	ffmpegStderr, err := ffmpegCmd.StderrPipe()
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("error creating stderr pipe: %v", err)
@@ -96,8 +97,7 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	}
 	go logPipe(ytdlpStderr, "yt-dlp")
 
-	// 7. Start both commands. Order matters: start the consumer (ffmpeg) before the producer (yt-dlp) to be safe,
-	// although starting yt-dlp first is generally fine as the pipe has a buffer.
+	// Start both commands.
 	if err := ytdlpCmd.Start(); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to start yt-dlp: %w", err)
 	}
@@ -107,11 +107,9 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 		return "", nil, nil, fmt.Errorf("failed to start ffmpeg: %w", err)
 	}
 
-	// 8. The caller will Wait() on ffmpeg. We spawn a goroutine to Wait() on yt-dlp
-	// to release its resources once it's done (or killed by a broken pipe).
+	// This goroutine will release yt-dlp's resources once it's done and will log any errors.
+	// The caller of this function will handle the ffmpeg process so we don't need to wait for it here.
 	go func() {
-		// A "broken pipe" error is expected if ffmpeg finishes first and closes its stdin.
-		// We can log this at a debug level as it's part of normal operation in this pipeline.
 		if err := ytdlpCmd.Wait(); err != nil {
 			slog.Debug("yt-dlp process finished", "error", err)
 		}

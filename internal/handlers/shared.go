@@ -11,8 +11,5 @@ var fileIDs = make(map[string]string)
 // progressTracker maps process IDs to their progress channels
 var progressTracker = make(map[string]chan models.ProgressResponse)
 
-// jobStatus tracks the final state of a job (completed, failed)
-var jobStatus = make(map[string]string)
-
-// mu protects concurrent access to fileIDs, progressTracker, and jobStatus
+// mu protects concurrent access to fileIDs and progressTracker.
 var mu sync.RWMutex

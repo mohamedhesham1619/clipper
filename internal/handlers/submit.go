@@ -33,18 +33,18 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a unique ID for the file and store it
+	// Generate a unique ID for the file
 	fileId := utils.GenerateID()
 	
+	// Store the file path and progress channel in the shared maps
 	mu.Lock()
 	fileIDs[fileId] = filePath
 	progressTracker[fileId] = progressChannel
-	jobStatus[fileId] = "in_progress"
 	mu.Unlock()
 
-	// In a goroutine, wait for the command to finish and update the job status.
+	// Start a goroutine to handle the ffmpeg process without blocking the main handler.
 	go func() {
-		// Ensure the progress channel is always closed and removed from the tracker when this goroutine exits.
+		// Close the progress channel and remove it from the tracker when done
 		defer func() {
 			close(progressChannel)
 			mu.Lock()
@@ -52,16 +52,15 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			mu.Unlock()
 		}()
 
-		// cmd.Wait() blocks until the ffmpeg process is finished.
+		// If the download fails, send an error message on the channel and clean up.
 		if err := cmd.Wait(); err != nil {
-			// This block runs if ffmpeg fails.
+
 			slog.Error("ffmpeg process failed", "error", err, "processId", fileId)
 
 			// Send a failure message on the channel before closing it.
 			progressChannel <- models.ProgressResponse{Status: "error"}
 
 			mu.Lock()
-			jobStatus[fileId] = "failed"
 			delete(fileIDs, fileId) // Remove so it can't be downloaded
 			mu.Unlock()
 			os.Remove(filePath) // remove potentially partial file
@@ -78,15 +77,11 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			DownloadUrl: fmt.Sprintf("/download/%v", fileId),
 		}
 
-		mu.Lock()
-		jobStatus[fileId] = "completed"
-		mu.Unlock()
-
+		// Schedule cleanup of the file after certain time
 		time.AfterFunc(10*time.Minute, func() {
-			slog.Info("Cleaning up old file and status", "processId", fileId, "path", filePath)
+			slog.Info("Cleaning up old file", "processId", fileId, "path", filePath)
 			mu.Lock()
 			delete(fileIDs, fileId)
-			delete(jobStatus, fileId)
 			mu.Unlock()
 			os.Remove(filePath)
 		})

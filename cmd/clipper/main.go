@@ -2,21 +2,27 @@ package main
 
 import (
 	"clipper/internal/server"
+	"flag"
+	
 	"log/slog"
 	"os"
 )
 
 func main() {
+	
+	// --- Command Line Argument Parsing ---
+	debug := flag.Bool("debug", false, "Enable debug level logging")
+	flag.Parse()
 
 	// --- Logger Setup ---
-	// Create a new handler with the minimum log level set to DEBUG.
-	opts := &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+	logLevel := slog.LevelInfo
+	if *debug {
+		logLevel = slog.LevelDebug
 	}
-
+	opts := &slog.HandlerOptions{
+		Level: logLevel,
+	}
 	handler := slog.NewTextHandler(os.Stdout, opts)
-
-	// Set this new logger as the default for the entire application.
 	slog.SetDefault(slog.New(handler))
 
 	// --- Server Initialization ---
