@@ -17,9 +17,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	fileId := strings.TrimPrefix(r.URL.Path, "/download/")
 	
 	// Get the file name from the map if it exists
-	mu.RLock()
-	filePath, exists := fileIDs[fileId]
-	mu.RUnlock()
+	filePath, exists := data.getFilePath(fileId)
 	
 	if !exists {
 		http.Error(w, "File not found", http.StatusNotFound)

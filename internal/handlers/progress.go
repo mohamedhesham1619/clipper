@@ -13,9 +13,7 @@ func ProgressHandler(w http.ResponseWriter, r *http.Request) {
 	processId := strings.TrimPrefix(r.URL.Path, "/progress/")
 
 	// Get the progress channel
-	mu.RLock()
-	progressChannel, exists := progressTracker[processId]
-	mu.RUnlock()
+	progressChannel, exists := data.getProgressChannel(processId)
 	
 	if !exists {
 		http.Error(w, "Process not found", http.StatusNotFound)

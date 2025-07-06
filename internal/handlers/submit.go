@@ -37,19 +37,15 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	fileId := utils.GenerateID()
 	
 	// Store the file path and progress channel in the shared maps
-	mu.Lock()
-	fileIDs[fileId] = filePath
-	progressTracker[fileId] = progressChannel
-	mu.Unlock()
+	data.addFileID(fileId, filePath)
+	data.addProgressChannel(fileId, progressChannel)
 
 	// Start a goroutine to handle the ffmpeg process without blocking the main handler.
 	go func() {
-		// Close the progress channel and remove it from the tracker when done
+		// Close the progress channel and remove it from the tracker when done.
 		defer func() {
 			close(progressChannel)
-			mu.Lock()
-			delete(progressTracker, fileId)
-			mu.Unlock()
+			data.removeProgressChannel(fileId)
 		}()
 
 		// If the download fails, send an error message on the channel and clean up.
@@ -60,9 +56,8 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			// Send a failure message on the channel before closing it.
 			progressChannel <- models.ProgressResponse{Status: "error"}
 
-			mu.Lock()
-			delete(fileIDs, fileId) // Remove so it can't be downloaded
-			mu.Unlock()
+			// The file ID is removed immediately on failure.
+			data.removeFileID(fileId)
 			os.Remove(filePath) // remove potentially partial file
 			return
 		}
@@ -80,9 +75,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		// Schedule cleanup of the file after certain time
 		time.AfterFunc(10*time.Minute, func() {
 			slog.Info("Cleaning up old file", "processId", fileId, "path", filePath)
-			mu.Lock()
-			delete(fileIDs, fileId)
-			mu.Unlock()
+			data.removeFileID(fileId)
 			os.Remove(filePath)
 		})
 	}()
