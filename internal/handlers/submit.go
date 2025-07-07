@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -22,6 +21,15 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	var videoRequest models.VideoRequest
 	json.NewDecoder(r.Body).Decode(&videoRequest)
 
+	// Log the request details
+	clipDuration, _ := utils.ParseClipDuration(videoRequest.ClipStart, videoRequest.ClipEnd)
+	clipDurationFormatted := utils.FormatSecondsToMMSS(clipDuration)
+	slog.Info("Received download request",
+		"ip", r.RemoteAddr,
+		"url", videoRequest.VideoURL,
+		"quality", videoRequest.Quality,
+		"clip duration", clipDurationFormatted)
+
 	// Start the download process
 	filePath, progressChannel, cmd, err := utils.DownloadVideo(videoRequest)
 
@@ -35,19 +43,30 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique ID for the file
 	fileId := utils.GenerateID()
-	
-	// Store the file path and progress channel in the shared maps
+
+	// Store the file path, progress channel, and process in the shared maps
 	data.addFileID(fileId, filePath)
 	data.addProgressChannel(fileId, progressChannel)
+	data.addProcess(fileId, cmd)
 
-	// Start a goroutine to handle the ffmpeg process without blocking the main handler.
+	select{
+		// if the client disconnects or cancels the request, stop the process and clean up
+		case <- r.Context().Done():
+			slog.Warn("client disconnected, stopping the downloading process.", "ip", r.RemoteAddr)
+			cmd.Process.Kill() // Stop the ffmpeg process
+			data.cleanupAll(fileId) // Clean up all associated data
+			return
+		default:
+			// Continue with the normal processing
+	}
+
+	// Respond with the process ID
+	json.NewEncoder(w).Encode(response{Status: "started", ProcessId: fileId})
+
+	// Start a goroutine to handle the rest of the download process
+	// This will monitor the ffmpeg command and clean up resources when done.
 	go func() {
-		// Close the progress channel and remove it from the tracker when done.
-		defer func() {
-			close(progressChannel)
-			data.removeProgressChannel(fileId)
-		}()
-
+		
 		// If the download fails, send an error message on the channel and clean up.
 		if err := cmd.Wait(); err != nil {
 
@@ -56,9 +75,9 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			// Send a failure message on the channel before closing it.
 			progressChannel <- models.ProgressResponse{Status: "error"}
 
-			// The file ID is removed immediately on failure.
-			data.removeFileID(fileId)
-			os.Remove(filePath) // remove potentially partial file
+			// close the progress channel and clean up
+			close(progressChannel)
+			data.cleanupAll(fileId)
 			return
 		}
 
@@ -72,15 +91,14 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 			DownloadUrl: fmt.Sprintf("/download/%v", fileId),
 		}
 
-		// Schedule cleanup of the file after certain time
-		time.AfterFunc(10*time.Minute, func() {
-			slog.Info("Cleaning up old file", "processId", fileId, "path", filePath)
-			data.removeFileID(fileId)
-			os.Remove(filePath)
-		})
+		close(progressChannel)
+
+		// wait for a while to ensure the client can download the file then clean up
+		time.Sleep(10 * time.Second) 
+		data.cleanupAll(fileId)
+		slog.Info("cleanup completed for process", "processId", fileId)
 	}()
 
-	// Respond with the process ID
-	json.NewEncoder(w).Encode(response{Status: "started", ProcessId: fileId})
+	
 
 }

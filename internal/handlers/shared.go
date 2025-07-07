@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"clipper/internal/models"
+	"os"
+	"os/exec"
 	"sync"
 )
 
@@ -13,7 +15,11 @@ type sharedData struct {
 	// progressTracker maps process IDs to their progress channels
 	progressTracker map[string]chan models.ProgressResponse
 
-	// mu protects concurrent access to fileIDs and progressTracker.
+	// processes maps process IDs to their ffmpeg *exec.Cmd
+	// it is used to stop the ffmpeg process if the client disconnects
+	processes map[string]*exec.Cmd
+
+	// mu protects concurrent access to fileIDs, progressTracker, and processes.
 	mu sync.RWMutex
 }
 
@@ -55,8 +61,37 @@ func (s *sharedData) removeFileID(fileID string) {
 	s.mu.Unlock()
 }
 
+func (s *sharedData) addProcess(fileID string, cmd *exec.Cmd) {
+	s.mu.Lock()
+	s.processes[fileID] = cmd
+	s.mu.Unlock()
+}
+
+func (s *sharedData) getProcess(fileID string) (*exec.Cmd, bool) {
+	s.mu.RLock()
+	cmd, exists := s.processes[fileID]
+	s.mu.RUnlock()
+	return cmd, exists
+}
+
+func (s *sharedData) removeProcess(fileID string) {
+	s.mu.Lock()
+	delete(s.processes, fileID)
+	s.mu.Unlock()
+}
+
+func (s *sharedData) cleanupAll(fileID string) {
+	filePath, _ := s.getFilePath(fileID)
+	os.Remove(filePath)
+	s.removeFileID(fileID)
+	s.removeProgressChannel(fileID)
+	s.removeProcess(fileID)
+
+}
+
 var data = &sharedData{
 	fileIDs:         make(map[string]string),
 	progressTracker: make(map[string]chan models.ProgressResponse),
+	processes:       make(map[string]*exec.Cmd),
 	mu:              sync.RWMutex{},
 }

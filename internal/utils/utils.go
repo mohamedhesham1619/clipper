@@ -86,3 +86,14 @@ func ParseClipDuration(startTime, endTime string) (duration string, err error) {
 
 	return duration, nil
 }
+
+// FormatSecondsToMMSS converts a string representing seconds to mm:ss format.
+func FormatSecondsToMMSS(secondsStr string) string {
+	seconds, err := strconv.Atoi(secondsStr)
+	if err != nil || seconds < 0 {
+		return "00:00"
+	}
+	minutes := seconds / 60
+	secs := seconds % 60
+	return fmt.Sprintf("%02d:%02d", minutes, secs)
+}

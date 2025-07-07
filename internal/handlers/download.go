@@ -15,10 +15,11 @@ import (
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the file ID from the URL
 	fileId := strings.TrimPrefix(r.URL.Path, "/download/")
-	
+	slog.Info("Received download request", "ip", r.RemoteAddr, "fileId", fileId)
+
 	// Get the file name from the map if it exists
 	filePath, exists := data.getFilePath(fileId)
-	
+
 	if !exists {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -31,7 +32,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "File not found or unreadable", http.StatusNotFound)
 		return
 	}
-	
+
 	// Open the file
 	file, err := os.Open(filePath)
 
@@ -58,6 +59,11 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileInfo.Name()))
 
 	// Copy the file to the response writer
-	io.Copy(w, file)
+	_, err = io.Copy(w, file)
+	if err != nil {
+		slog.Error("Error serving file", "ip", r.RemoteAddr, "fileId", fileId, "error", err)
+	} else {
+		slog.Info("File served successfully", "ip", r.RemoteAddr, "fileId", fileId)
+	}
 
 }
