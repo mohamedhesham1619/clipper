@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VideoClipper</title>
-    <style>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1zcXVhcmUtc2Npc3NvcnMtaWNvbiBsdWNpZGUtc3F1YXJlLXNjaXNzb3JzIj48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHg9IjIiIHk9IjIiIHJ4PSIyIi8+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjIiLz48cGF0aCBkPSJNOS40MTQgOS40MTQgMTIgMTIiLz48cGF0aCBkPSJNMTQuOCAxNC44IDE4IDE4Ii8+PGNpcmNsZSBjeD0iOCIgY3k9IjE2IiByPSIyIi8+PHBhdGggZD0ibTE4IDYtOC41ODYgOC41ODYiLz48L3N2Zz4=">
+    <title>Free Video Clipper - Download Clips Online | VideoClipper</title>    <style>
         * {
             margin: 0;
             padding: 0;
@@ -35,43 +35,64 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 600px;
+            /* Increased width for better spacing */
             width: 100%;
-            margin: 2rem auto;
-            padding: 1.5rem;
+            margin: 3rem auto;
+            padding: 3rem 2.5rem;
+            /* More vertical padding */
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.13);
             flex-shrink: 0;
         }
 
         h1 {
             color: #1a202c;
-            margin-bottom: 2rem;
-            font-size: 1.8rem;
+            margin-bottom: 2.5rem;
+            font-size: 2.25rem;
+            /* Slightly smaller for better proportion */
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
-        .url-input {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
+        label,
+        .quality-label,
+        .duration-display,
+        .progress-bar-label span {
+            font-size: 1rem;
+            /* Consistent base font size */
         }
 
+        input[type="text"],
         .url-input input {
             flex: 1;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
+            padding: 1rem 1.2rem;
+            /* Consistent padding */
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
             font-size: 1rem;
+            /* Consistent font size */
+            height: 52px;
+            /* Consistent height */
         }
 
         .paste-btn {
-            padding: 0.75rem 1rem;
-            background: #2d3748;
-            color: white;
-            border: none;
-            border-radius: 4px;
+            padding: 1rem 1.2rem;
+            font-size: 1rem;
+            height: 52px;
+            /* Match input height */
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8f9fa;
+            color: #4a5568;
             cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .paste-btn:hover {
+            background: #e2e8f0;
+            border-color: #cbd5e0;
         }
 
         .time-controls {
@@ -80,6 +101,8 @@
             margin-bottom: 1rem;
             align-items: flex-start;
             /* Ensure top alignment */
+            gap: 1rem;
+            /* Add consistent gap */
         }
 
         .time-input {
@@ -93,13 +116,17 @@
             margin-bottom: 0.5rem;
             color: #4a5568;
             font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .time-input input {
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1rem;
+            height: 44px;
+            /* Consistent but slightly smaller than main input */
         }
 
         .timeline {
@@ -132,34 +159,54 @@
         .progress-bar {
             display: none;
             /* Initially hidden */
-            margin: 2rem 0;
+            margin: 2rem 0 0.75rem 0; /* Less space after the bar */
         }
 
         .progress-bar-label {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.5rem;
+            align-items: center;
         }
 
         .progress-track {
-            height: 4px;
+            height: 6px;
             background: #e2e8f0;
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
         .progress-fill {
             width: 0;
-            /* Start at 0% */
             height: 100%;
             background: #4a5568;
-            border-radius: 2px;
-            transition: width 0.3s ease;
+            border-radius: 3px;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
 
+        /* Improved animated stripes for loading */
         .progress-fill.connecting {
             width: 100%;
-            background: #718096;
-            animation: pulse 2s infinite;
+            background: repeating-linear-gradient(
+                135deg,
+                #718096 0px,
+                #718096 10px,
+                #a0aec0 10px,
+                #a0aec0 20px
+            );
+            animation: progress-stripes 1s linear infinite;
+        }
+
+        @keyframes progress-stripes {
+            0% {
+                background-position: 0 0;
+            }
+
+            100% {
+                background-position: 40px 0;
+            }
         }
 
         @keyframes pulse {
@@ -180,25 +227,33 @@
             margin-top: 2rem;
             display: flex;
             gap: 1rem;
-            align-items: flex-end;  /* Align items to bottom */
+            align-items: flex-end;
+            /* Align items to bottom */
         }
 
         .download-btn {
+            height: 52px;
+            font-size: 1rem;
+            padding: 0 2rem;
             flex: 1;
-            background: #1a202c;  /* Darker black */
-            padding: 0.75rem 1.5rem;
+            background: #1a202c;
+            /* Darker black */
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            height: 56px;  /* Increased height further */
-            font-size: 1rem;
             font-weight: 500;
-            line-height: 1.2;  /* Increased line height */
+            line-height: 1.2;
+            transition: all 0.2s ease;
+        }
+
+        .download-btn:hover {
+            background: #2d3748;
+            transform: translateY(-1px);
         }
 
         .quality-wrapper {
@@ -210,31 +265,66 @@
         .quality-label {
             color: #4a5568;
             font-size: 0.9rem;
+            font-weight: 500;
         }
 
         .quality-select {
-            padding: 0.75rem;
-            background: #4a5568;  /* Different color from download button */
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            min-width: 100px;
-            text-align: center;
+            padding: 0.75rem 1rem;
             font-size: 1rem;
-            height: 56px;  /* Increased height to match */
-            line-height: 1.2;  /* Increased line height */
-            padding-top: 0;    /* Adjust padding */
-            padding-bottom: 0; /* Adjust padding */
+            height: 52px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .url-input {
+            display: flex;
+            gap: 0.5rem;
+            align-items: stretch;
+            margin-bottom: 1.25rem; /* Add this line for spacing */
         }
 
         @media screen and (max-width: 768px) {
             .actions {
                 align-items: stretch;
+                flex-direction: column;
+                gap: 1rem;
             }
-            
+
             .quality-wrapper {
                 width: 100%;
+            }
+
+            .container {
+                margin: 1rem;
+                border-radius: 12px;
+                padding: 2rem 1.5rem;
+                max-width: calc(100vw - 2rem);
+            }
+
+            h1 {
+                font-size: 1.75rem;
+                margin-bottom: 2rem;
+            }
+
+            input[type="text"],
+            .url-input input,
+            .quality-select,
+            .download-btn {
+                font-size: 1rem;
+                padding: 0.875rem 1rem;
+                height: 48px;
+            }
+
+            .time-input input {
+                height: 44px;
+                padding: 0.75rem 0.875rem;
+            }
+
+            .paste-btn {
+                height: 48px;
+                padding: 0.875rem 1rem;
             }
         }
 
@@ -252,9 +342,10 @@
         }
 
         #durationTime {
-            font-weight: bold;
+            font-weight: 600;
         }
 
+        /* Animated ellipsis for progress text */
         @keyframes ellipsis {
             0% {
                 content: '';
@@ -277,10 +368,30 @@
             }
         }
 
-        .loading::after {
-            content: '';
+        .animated-ellipsis::after {
             display: inline-block;
-            animation: ellipsis 2s steps(1) infinite;
+            animation: ellipsis 1.2s steps(4, end) infinite;
+            content: '';
+            vertical-align: bottom;
+        }
+
+        /* Pulse effect for progress text */
+        @keyframes pulseText {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .pulse-text {
+            animation: pulseText 1.2s infinite;
         }
 
         .page-wrapper {
@@ -335,10 +446,13 @@
 <body>
     <header class="header">
         <div class="logo">
+            <!-- Scissors SVG icon -->
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                <line x1="7" y1="2" x2="7" y2="22"></line>
-                <line x1="17" y1="2" x2="17" y2="22"></line>
+                <circle cx="6" cy="6" r="3"></circle>
+                <circle cx="6" cy="18" r="3"></circle>
+                <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+                <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+                <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
             </svg>
             VideoClipper
         </div>
@@ -353,10 +467,13 @@
                     <input type="text" placeholder="Paste YouTube, Facebook, or any video URL" id="videoUrl"
                         name="videoUrl">
                     <button type="button" class="paste-btn">
+                        <!-- Clipboard with plus (paste) SVG icon -->
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <path d="M16 4h2a2 0 0 1 2 2v14a2 0 0 1-2 2H6a2 0 0 1-2-2V6a2 0 0 1 2-2h2"></path>
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            <rect x="9" y="2" width="6" height="4" rx="1" ry="1"></rect>
+                            <path d="M4 7V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"></path>
+                            <path d="M12 11v6"></path>
+                            <path d="M9 14h6"></path>
                         </svg>
                     </button>
                 </div>
@@ -538,11 +655,13 @@
             const progressValue = document.querySelector('.progress-value');
             const progressLabel = document.querySelector('.progress-bar-label span:first-child');
 
-            // Show connecting state
+            // Show connecting state with animation
             progressBar.style.display = 'block';
             progressFill.classList.add('connecting');
-            progressValue.textContent = 'Connecting...';
-            progressLabel.textContent = 'Initializing';
+            progressValue.textContent = '';
+            progressValue.classList.add('animated-ellipsis', 'pulse-text');
+            progressLabel.textContent = 'Preparing your clip';
+            progressLabel.classList.add('pulse-text', 'animated-ellipsis');
 
             try {
                 // Submit request
@@ -573,6 +692,10 @@
                         const data = JSON.parse(event.data);
                         console.log('Progress data:', data); // Debug log
                         
+                        // Remove animation classes when progress starts
+                        progressValue.classList.remove('animated-ellipsis', 'pulse-text');
+                        progressLabel.classList.remove('animated-ellipsis', 'pulse-text');
+
                         if (data.status === 'error') {
                             alert(data.message || 'Failed to process video');
                             progressFill.classList.remove('connecting');
@@ -606,6 +729,8 @@
                 });
 
             } catch (error) {
+                progressValue.classList.remove('animated-ellipsis', 'pulse-text');
+                progressLabel.classList.remove('animated-ellipsis', 'pulse-text');
                 alert(error.message);
                 progressFill.classList.remove('connecting');
                 progressFill.style.width = '0%';
