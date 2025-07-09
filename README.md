@@ -12,7 +12,6 @@ This project has two main branches, each implementing a distinct real-time updat
 
 *   `main`: Uses WebSockets.
 
-
 ## Tech Stack
 
 - **Backend:** Go
@@ -37,3 +36,10 @@ This project has two main branches, each implementing a distinct real-time updat
 
 3. **Access the application:**  
    Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+## Demo
+
+
+https://github.com/user-attachments/assets/631e8b5f-0b27-40ea-a1c6-a669859336ea
+
+
