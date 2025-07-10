@@ -17,37 +17,18 @@ import (
 func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.ProgressResponse, *exec.Cmd, error) {
 
 	// Start a goroutine to get the video title and construct the download path.
+	// This is a separate command to avoid mixing its output with the video stream.
 	downloadPathChan := make(chan string)
 	defer close(downloadPathChan)
 
 	go func() {
-		// Get video title to determine output filename.
-		// This is a quick, separate command to avoid mixing its output with the video stream.
-		infoCmd := exec.Command("yt-dlp",
-			"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
-			"--print", "%(title)s-%(height)sp.%(ext)s",
-			"--no-playlist",
-			"--no-download",
-			"--no-warnings",
-			videoRequest.VideoURL,
-		)
-
-		infoOutput, err := infoCmd.CombinedOutput()
-
+		
+		videoTitle, err := getVideoTitle(videoRequest)
 		if err != nil {
-			slog.Error("yt-dlp failed to get video info", "error", err, "output", string(infoOutput))
+			slog.Error("failed to get video title", "error", err)
 			downloadPathChan <- ""
 			return
 		}
-		if len(infoOutput) == 0 {
-			slog.Error("yt-dlp returned empty output for video info", "videoURL", videoRequest.VideoURL)
-			downloadPathChan <- ""
-			return
-		}
-		slog.Debug("yt-dlp video title", "title", string(infoOutput))
-
-		// Sanitize the video title to create a valid filename.
-		videoTitle := SanitizeFilename(strings.TrimSpace(string(infoOutput)))
 
 		// Construct the download path using the sanitized title.
 		// This will be used to save the video file.
@@ -62,22 +43,15 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 		return "", nil, nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Prepare yt-dlp command for streaming video data to its stdout.
-	ytdlpCmd := exec.Command("yt-dlp",
-		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
-		"--download-sections", fmt.Sprintf("*%s-%s", videoRequest.ClipStart, videoRequest.ClipEnd),
-		"--no-warnings",
-		"-o", "-", // Critical: output to stdout
-		videoRequest.VideoURL,
-	)
+	// Create the yt-dlp and ffmpeg commands.
+	ytdlpCmd := prepareYtDlpCommand(videoRequest)
+	ffmpegCmd := prepareFfmpegCommand()
 
-	// Prepare ffmpeg command to read from its stdin.
-	ffmpegCmd := exec.Command("ffmpeg",
-		"-hide_banner", // Quieter logs
-		"-i", "pipe:0", // Critical: read from stdin
-		"-progress", "pipe:1", // Progress to stdout
-		"-c", "copy", // Just copy the stream yt-dlp provides.
-	)
+	err := preparePipes(ytdlpCmd, ffmpegCmd)
+
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("error preparing pipes: %v", err)
+	}
 
 	// Calculate the total clip duration.
 	// This is used to calculate the progress percentage.
@@ -94,35 +68,16 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	// This pipe will be used to read progress updates.
 	ffmpegStdout, err := ffmpegCmd.StdoutPipe()
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("error creating stdout pipe: %v", err)
+		return "", nil, nil, fmt.Errorf("error creating ffmpeg stdout pipe: %v", err)
 	}
 	go readProgress(ffmpegStdout, progressChan, totalTime)
 
-	// This pipe will be used to log ffmpeg's stderr output.
-	// It's useful for debugging any issues with the ffmpeg command.
-	ffmpegStderr, err := ffmpegCmd.StderrPipe()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("error creating stderr pipe: %v", err)
-	}
-	go logPipe(ffmpegStderr, "ffmpeg")
-
-	// Also log yt-dlp's stderr for debugging any download-specific issues.
-	ytdlpStderr, err := ytdlpCmd.StderrPipe()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("error creating yt-dlp stderr pipe: %v", err)
-	}
-	go logPipe(ytdlpStderr, "yt-dlp")
-
 	// Get the download path from the channel when it's ready and add it to the ffmpeg command.
 	downloadPath := <-downloadPathChan
-	ffmpegCmd.Args = append(ffmpegCmd.Args, downloadPath)
-
-	// Set the stdin of ffmpeg to read from yt-dlp's stdout.
-	// This allows ffmpeg to process the video data streamed by yt-dlp.
-	ffmpegCmd.Stdin, err = ytdlpCmd.StdoutPipe()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("error connecting yt-dlp stdout to ffmpeg stdin: %v", err)
+	if downloadPath == "" {
+		return "", nil, nil, fmt.Errorf("failed to get video title for download path")
 	}
+	ffmpegCmd.Args = append(ffmpegCmd.Args, downloadPath)
 
 	// Start both commands.
 	if err := ytdlpCmd.Start(); err != nil {
@@ -143,6 +98,81 @@ func DownloadVideo(videoRequest models.VideoRequest) (string, chan models.Progre
 	}()
 
 	return downloadPath, progressChan, ffmpegCmd, nil
+}
+
+func prepareYtDlpCommand(videoRequest models.VideoRequest) *exec.Cmd {
+	return exec.Command("yt-dlp",
+		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
+		"--download-sections", fmt.Sprintf("*%s-%s", videoRequest.ClipStart, videoRequest.ClipEnd),
+		"--no-warnings",
+		"-o", "-", // Output to stdout
+		videoRequest.VideoURL,
+	)
+}
+
+func prepareFfmpegCommand() *exec.Cmd {
+	return exec.Command("ffmpeg",
+		"-hide_banner", // Quieter logs
+		"-i", "pipe:0", // Read from stdin
+		"-progress", "pipe:1", // Progress to stdout
+		"-c", "copy", // Just copy the stream yt-dlp provides.
+	)
+}
+
+// preparePipes sets up the necessary pipes for yt-dlp and ffmpeg commands.
+func preparePipes(ytdlpCmd *exec.Cmd, ffmpegCmd *exec.Cmd) error {
+
+	// This pipe will be used to log ffmpeg's stderr output.
+	// It's useful for debugging any issues with the ffmpeg command.
+	ffmpegStderr, err := ffmpegCmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("error creating stderr pipe: %v", err)
+	}
+	go logPipe(ffmpegStderr, "ffmpeg")
+
+	// Also log yt-dlp's stderr for debugging any download-specific issues.
+	ytdlpStderr, err := ytdlpCmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("error creating yt-dlp stderr pipe: %v", err)
+	}
+	go logPipe(ytdlpStderr, "yt-dlp")
+
+	// Set the stdin of ffmpeg to read from yt-dlp's stdout.
+	// This allows ffmpeg to process the video data streamed by yt-dlp.
+	ffmpegCmd.Stdin, err = ytdlpCmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("error connecting yt-dlp stdout to ffmpeg stdin: %v", err)
+	}
+
+	return nil
+}
+
+// getVideoTitle retrieves the video title using yt-dlp and sanitizes it for use as a filename.
+func getVideoTitle(videoRequest models.VideoRequest) (string, error) {
+	infoCmd := exec.Command("yt-dlp",
+		"-f", fmt.Sprintf("bv*[height<=%[1]v]+ba/b[height<=%[1]v]/best", videoRequest.Quality),
+		"--print", "%(title)s-%(height)sp.%(ext)s",
+		"--no-playlist",
+		"--no-download",
+		"--no-warnings",
+		videoRequest.VideoURL,
+	)
+
+	infoOutput, err := infoCmd.CombinedOutput()
+
+	if err != nil {
+		slog.Error("yt-dlp failed to get video info", "error", err, "output", string(infoOutput))
+		return "", fmt.Errorf("failed to get video info: %w", err)
+	}
+	if len(infoOutput) == 0 {
+		slog.Error("yt-dlp returned empty output for video info", "videoURL", videoRequest.VideoURL)
+		return "", fmt.Errorf("yt-dlp returned empty output for video info: %w", err)
+	}
+	slog.Debug("yt-dlp video title", "title", string(infoOutput))
+
+	// Sanitize the video title to create a valid filename.
+	videoTitle := SanitizeFilename(strings.TrimSpace(string(infoOutput)))
+	return videoTitle, nil
 }
 
 // logPipe reads from a process's output pipe and logs each line for debugging.

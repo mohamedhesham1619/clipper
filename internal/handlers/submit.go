@@ -94,7 +94,7 @@ func SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		close(progressChannel)
 
 		// wait for a while to ensure the client can download the file then clean up
-		time.Sleep(10 * time.Second) 
+		time.Sleep(10 * time.Minute)
 		data.cleanupAll(fileId)
 		slog.Info("cleanup completed for process", "processId", fileId)
 	}()
