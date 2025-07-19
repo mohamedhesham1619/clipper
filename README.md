@@ -39,7 +39,21 @@ This project has two main branches, each implementing a distinct real-time updat
 
 ## Demo
 
-
 https://github.com/user-attachments/assets/631e8b5f-0b27-40ea-a1c6-a669859336ea
+
+
+
+## 🚀 Live Demo
+
+Try the hosted app with extra features at: [https://videoclipper.online](https://videoclipper.online)
+
+**The hosted app includes:**
+- SEO-optimized pages for better discoverability
+- Enhanced real-time progress updates
+- Rate limiting to prevent abuse
+- Contact form for user feedback
+- All the core features of this open-source version
+
+---
 
 
