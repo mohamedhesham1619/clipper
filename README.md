@@ -8,9 +8,9 @@ Simply provide a URL, define your start and end times, choose the video quality,
 
 This project has two main branches, each implementing a distinct real-time update strategy:
 
-*   `sse-version` (this branch): Uses Server-Sent Events (SSE).
+*   `main` (this branch): Uses Server-Sent Events (SSE).
 
-*   `main`: Uses WebSockets.
+*   `socket-version`: Uses WebSockets.
 
 ## Tech Stack
 
